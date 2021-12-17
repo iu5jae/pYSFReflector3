@@ -1,0 +1,14 @@
+[Unit]
+Description=pYSFReflector data collector
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=30
+User=root
+ExecStart=/opt/pysfreflector/collector3.py
+
+[Install]
+WantedBy=multi-user.target
