@@ -36,16 +36,16 @@ The last DG ID used is "stored" in /opt/pysreflector/dgid.json so that, in case 
 Remember: to set a static flow with a specific DG ID you must rename your gateway link with a -nn (example: IK5XMK-22 or TG22-30 …) at the end of the callsign, as static DG ID (10 total chars! do not exceed this number). This allows you to use external software for linking with specific flow. Of course, the DG ID (-nn) of the gateway must be in the list among those "allowed" in the reflector (list option).
 
 pYSF3 is a multiport connections system. As in the .ini:
-# aux ports linked statically at DG-ID (empty string if not used)
-# format:
-#       DG-ID:port
+aux ports linked statically at DG-ID (empty string if not used)
+format:
+
 aux_port =  41:42397, 88:42398
 
 It can be very useful for the diversified management of flows in combination with specific DG IDs. It was tested on BM, requesting the connection on the same pYSF reflector of two TGs and defining the DG ID to a specific port / connection. So, on the BM side, we have two distinct YSF connections to specific ports (FIXED, in dashboard), and on the YSF side, two flows to specific DG IDs.
 
 sysop side of the reflector, the last section of the configuration file adds a useful feature to reduce and combine the presence of multiple YSF reflectors in a single system. In fact, it is possible to combine a flow not only with a port as we have seen previously, but also with a YSF reflector ID (identifier). By doing this, the new pYSF3 will respond to the registry like a normal YSF and it will be possible to manage (and therefore remove the old installation) a single "virtual YSF" on each DG ID. Let's see a practical example:
 
-#       DG-ID:port 
+DG-ID:port 
 aux_port =  41:42397, 88:42398
 
 [REFL_ALIAS]
