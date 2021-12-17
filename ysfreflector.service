@@ -1,0 +1,14 @@
+[Unit]
+Description=pYSFReflector
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=30
+User=root
+ExecStart=/opt/pysfreflector/YSFReflector /opt/pysfreflector/pysfreflector.ini
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,43 @@
+make two services in /lib/systemd/system/
+check the options and programs path...
+then use systemctl start/stop/status/enable/disable servicename.service
+
+
+ysfreflector.service
+
+
+[Unit]
+Description=YSFReflector
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+User=root
+ExecStart=/opt/pysfreflector/YSFReflector /opt/pysfreflector/YSFReflector.ini
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+ysfcollector.service
+
+
+[Unit]
+Description=YSFCollector
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+User=root
+ExecStart=/opt/pysfreflector/collector3.py
+
+[Install]
+WantedBy=multi-user.target

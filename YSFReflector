@@ -1,0 +1,1496 @@
+#!/usr/bin/python3
+
+#    pYSFReflector3 - Multistream YSF Reflector
+#
+#    Created by Antonio Matraia (IU5JAE) on 20/02/2021.
+#    Copyright 2021 Antonio Matraia (IU5JAE). All rights reserved.
+
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+import random
+import socket
+import threading
+import queue
+import sys
+import os
+import time
+import re
+import configparser
+import signal
+from datetime import datetime
+import bisect 
+import struct
+import ysffich
+import ysfpayload
+import ysfutils
+import gps
+import ysfaprs
+import json
+from tinydb import TinyDB, Query
+
+
+def ip2long(ip):
+    packed = socket.inet_aton(ip)
+    lng = struct.unpack("!L", packed)[0]
+    return lng
+
+
+def long2ip(lng):
+    packed = struct.pack("!L", lng)
+    ip = socket.inet_ntoa(packed)
+    return ip
+
+
+## LH list management ##
+def inserisci_lista(lista, elemento, n_max):
+    if (len(lista) < n_max):
+        lista.append(elemento)
+    else:
+        for i in range(n_max - 1):
+            lista[i] = lista[i+1]
+        lista[n_max-1] = elemento    
+
+def inserisci_listaD(lista, elemento, n_max):    
+    for i in lista:
+      if (i[1] == elemento[1]):
+        lista.remove(i)
+        break
+    
+    if (len(lista) < n_max):
+        lista.append(elemento)
+    else:
+        for i in range(n_max - 1):
+            lista[i] = lista[i+1]
+        lista[n_max-1] = elemento    
+
+
+
+def stampa_lista(lista):
+  for i in range(len(lista)):
+      print(lista[len(lista)-i-1])
+
+#################################
+
+def inlist(a, x):
+    i = bisect.bisect_left(a, x)
+    if i != len(a) and a[i] == x:
+        return True
+    else:
+        return False        
+
+def check_string(l):
+  s = ''
+  for c in l:
+     if ((not c.isprintable()) and (ord(c) != 10)):
+       s += '<' +str(ord(c))  + '>' 
+     if c.isprintable():
+       s += c  
+  return s
+
+
+def RecvData(sock,recvPackets):
+    while True:
+        try:
+          data,addr = sock[0].recvfrom(2048)    # block if I don't receive anything 
+          recvPackets.put((data,addr,sock))
+        except:
+          printlog(1, 'Error in RecvData') 
+        
+
+def CalcID(ref):
+  c = ref.strip().ljust(16)
+  u = 0
+
+  for a in c:
+    u = (u + ord(a)) & 0xFFFFFFFF
+    u = (u + (u << 10) & 0xFFFFFFFF) & 0xFFFFFFFF
+    u = (u ^ (u >> 6)) & 0xFFFFFFFF
+
+  u = (u + (u << 3) & 0xFFFFFFFF) & 0xFFFFFFFF
+  u = (u ^ (u >> 11))& 0xFFFFFFFF
+  u = (u + (u << 15)& 0xFFFFFFFF)& 0xFFFFFFFF
+
+  u = u % 100000
+  return u
+
+        
+def ElencoNodi(cl,qjs):
+  global SCHED
+  while True:
+    time.sleep(120)
+    n_r = 0
+    cl_lo = []
+    if (len(cl) == 0):
+      printlog(1, 'No repeaters/gateways linked')
+      qjs.put('{"linked": "0"}')
+    else:
+      printlog(1, 'Currently linked repeaters/gateways:')
+      for c in cl:
+        n_r += 1
+        printlog(1, '     ' + c[2].ljust(10) + ': ' + str(c[0]) + ':' + str(c[1]) + ' ' + str(c[3]) + '/60 : ' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + ' ' + str(c[8]).rjust(2) + ' ' + str(c[9]).rjust(2) + ' ' + str(c[12]).rjust(2) + ' ' + str(c[13]).rjust(4) + ' ' + str(c[14]).rjust(4))
+        sjson = '{"linked": "' + str(n_r) + '", "call": "' + c[2] + '", "IP": "' + str(c[0]) + '", "port": "' + str(c[1]) +'", "TC": "' + str(c[3]) + '", "CF": "' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + '", "LO": "' + str(c[5]) + '", "LK": "' + str(c[7]) + '", "DGID": "' + str(c[8]) + '", "T_HOLD": "' + str(c[9])  + '", "BTH_DGID": "' + str(c[12]) + '", "BTH_TOUT": "' + str(c[13]) + '", "BTH_TCORR": "' + str(c[14]) + '"}'
+        qjs.put(sjson)
+        if (c[5] == 1):
+          cl_lo.append(c)
+      sjson = '{"total_linked": "' + str(n_r) + '"}'
+      qjs.put(sjson)
+      if (len(cl_lo) == 0):
+        printlog(1, 'No repeaters/gateways muted')
+      else:
+        printlog(1, 'Currently muted repeaters/gateways:')
+        n_r = 0
+        for c in cl_lo:
+          n_r += 1
+          printlog(1, '     ' + c[2].ljust(10) + ': ' + str(c[0]) + ':' + str(c[1]) + ' ' + str(c[3]) + '/60')    
+    n_r = 0
+    for c in SCHED:
+      n_r += 1
+      sjson = '{"blk_time": "' + str(n_r) + '", "call": "' + c[0] + '", "BR": "' + c[1] + '", "TR": "' + datetime.utcfromtimestamp(c[2]).strftime("%Y-%m-%d %H:%M:%S") + '"}'  
+      qjs.put(sjson)
+    sjson = '{"total_blk_time": "' + str(n_r) + '"}'
+    qjs.put(sjson)
+
+
+def TimeoutNodi(cl):
+  global lock_nodi
+  while True:
+    time.sleep(1)
+    for c in cl:
+      bth = False
+      lock_nodi.acquire()
+      c[3] += 1
+      if ((c[12] != 0) and (c[8] != c[12])):
+        c[14] += 1
+        if (c[14] > c[13]):
+          c[8] = c[12]
+          c[14] = 0 
+          bth = True  
+      lock_nodi.release()
+      if (c[3] > 60):
+        printlog(1, 'Removing ' + c[2].ljust(10) + ' (' + c[0] + ':' + str(c[1]) + ') disappeared')
+        cl.remove(c)
+      if bth:
+        printlog(1,c[2] + ' Back to Home at DG-ID ' + str(c[8]))
+
+
+def TimeoutNodiJS(cl):
+  while True:
+    time.sleep(1)
+    for c in cl:
+      c[2] += 1
+      if (c[2] > 60):
+        printlog(1, 'Removing json client ' + c[0] + ':' + str(c[1]) + ' disappeared')
+        cl.remove(c)
+
+def aggiungi_prefisso(d, pref):
+  bya_msg = bytearray(d)
+  src = bya_msg[14:24].decode()
+  call_sp = re.split(r'[-/\' \']', src)
+  call = call_sp[0]
+  call_mod = (pref + call).ljust(10)
+  bya_msg = bya_msg[:14] + str.encode(call_mod) + bya_msg[24:]
+  
+  return(bytes(bya_msg))  
+
+
+def TimeoutTX(stream, t_lock, r_lock, t_out, t_react, jsmess):
+  global BLK_TMP
+  global SCHED
+  global lock_tx
+  while True:
+   for t in stream:
+    if (t[1] < 5):
+      lock_tx.acquire()
+      t[1] += 0.1
+      #print(t[1])
+      lock_tx.release()
+    if ((t[1] > 2.0) and (t[0] != 0)):
+      gps.gps_reset()
+      stream.remove(t)
+      printlog(1, '<' + str(t[5]).zfill(7) + '> Network watchdog has expired coords: ' + "{:.6f}".format(t[7]) + ', ' + "{:.6f}".format(t[8]))
+      if (t[16] == 2):
+        type_ch = 'TD'
+      else:
+        type_ch = 'WD'
+      jsmess.put('{"stream_end": "' + str(t[5]).zfill(7) + '", "type": "' + type_ch + '", "time": "' +  str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
+         
+    if (((time.time() - t[6]) > t_out) and (t[0] != 0)):       # Tx timeout
+      if (not inlist(BLK_TMP, t[3])):
+        bisect.insort(BLK_TMP,t[3])  
+        printlog(1, 'Timeout ' + t[3])
+        t_sched =  time.time() + t_react
+        SCHED.append([t[3], 'RCT', t_sched])       # append scheduled remove from blocked list
+        printlog(1, 'Appended scheduled job: ' + t[3] + '/RC at time '  + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(t_sched))) 
+        jsmess.put('{"stream_timeout": "' +  str(t[5]).zfill(7) + '", "CS": "' + t[3] + '", "time": "' +  str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
+        stream.remove(t)
+           
+   pop_list = []  
+   for d in t_lock:
+     if (t_lock[d] < 5):
+       t_lock[d] += 0.1
+       if (t_lock[d] > 1.5):    
+         pop_list.append(d)
+         r_lock.remove(d)
+        
+   for x in pop_list:
+     t_lock.pop(x)   
+     printlog(1, 'Removed from blockeds queue ' + str(x))
+   time.sleep(0.1)  
+
+def scheduler():
+  global BLK_TMP
+  global SCHED
+  while True:
+    time.sleep(1)
+    t = time.time()
+    try:
+      for sc in SCHED:
+        if (t > sc[2]):
+          if ((sc[1] == 'RCT') or (sc[1] == 'RCW')):
+            BLK_TMP.remove(sc[0])
+            SCHED.remove(sc)
+            printlog(1, 'Removed from temporary blockeds queue ' + sc[0]) 
+    except Exception as e:
+      printlog(1, 'Error removing from scheduler queue ' + str(e))
+
+
+def ckeck_wild_ptt(cs, tw, cnt, trea, jsmess):
+  global W_PTT
+  global BLK_TMP
+  n = 0
+  tc = time.time()
+  W_PTT.append([cs, tc])
+  for r in W_PTT:
+    if (r[1] < (tc - tw)):
+      W_PTT.remove(r)
+    else:
+      if (r[0] == cs):
+        n += 1  
+  if (n >= cnt):
+    printlog(1, 'Wild-PTT ' + r[0])
+    if (not inlist(BLK_TMP, r[0])):
+        bisect.insort(BLK_TMP,r[0])  
+        SCHED.append([r[0], 'RCW', tc + trea])
+        printlog(1, 'Appended scheduled job: ' + r[0] + '/RC at time '  + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(tc + trea)))
+        # jsmess.put('{"wild_ptt": "-1", "CS": "' + r[0] + '", "TR": "' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(tc + trea)) + '"}')
+  
+  
+def canTrasmit(cs, re_en):
+  global BLACK_LIST
+  global WHITE_LIST
+  global BLK_TMP
+  global SUF_BL
+
+  call_sp = re.split(r'[-/\' \']', cs)
+  call = call_sp[0]
+  
+## always block a stream from repeater/node/gateway ###
+  if (len(call_sp) > 1):
+    if inlist(SUF_BL, call_sp[1]):
+      return False      
+  
+  if inlist(BLK_TMP, call):
+    return False
+      
+## case CheckRE == 1 ###
+  if (re_en == 1):  
+    if inlist(WHITE_LIST, call):
+      return True
+    if inlist(BLACK_LIST, call):
+      return False
+    if (re.match(r'^\d?[A-Z]{1,2}\d{1,4}[A-Z]{1,3}$',call,re.IGNORECASE) and (len(call) <= 8)):
+      return True
+    else:
+      return False  
+
+## case CheckRE == 0 ###
+  if (re_en == 0):  
+    if inlist(WHITE_LIST, call):
+      return True
+    if inlist(BLACK_LIST, call):
+      return False
+    return True
+
+## case CheckRE == -1 ###
+  if (re_en == -1):  
+    if inlist(BLACK_LIST, call):
+      return False
+    if inlist(WHITE_LIST, call):
+      return True
+    return False
+    
+    
+def lista_gw(cl):
+  info = ''
+  for c in cl:
+    info += c[2] + ':' + c[0] + ':' + str(c[1]) + ':' + datetime.utcfromtimestamp(c[6]).strftime("%d-%m-%Y %H-%M-%S") + ';'  
+  return info
+
+
+def lista_invio(lista):
+  info = ''
+  for i in range(len(lista)):
+    info += lista[len(lista)-i-1][0] + ':' + lista[len(lista)-i-1][1] + ':' + lista[len(lista)-i-1][2] + ':' + str(lista[len(lista)-i-1][3]) + ':' + lista[len(lista)-i-1][4] + ':' + str(lista[len(lista)-i-1][5]) + ';'  
+  return info      
+
+
+def update_clients(cl):
+  global GW_BL
+  global IP_BL  
+  global GW_LK
+  global IP_LK  
+  for c in cl:
+    if (inlist(GW_BL, c[2]) or inlist(IP_BL, ip2long(c[0])) or inlist(GW_LK, c[2]) or inlist(IP_LK, ip2long(c[0]))):
+      c[5] = 1
+    else:  
+      c[5] = 0
+    if (inlist(GW_LK, c[2]) or inlist(IP_LK, ip2long(c[0]))):
+      c[7] = 1
+    else:  
+      c[7] = 0
+
+
+def homedb(f_home, t_reload, cli, dgid_list):
+  global GW_HOME
+  
+  f_time_old = 0
+  try:
+    f_time = os.stat(f_home).st_mtime
+  except:
+    pass
+  
+  while True:
+    f_time = os.stat(f_home).st_mtime
+    if (f_time != f_time_old):
+      try:
+        file = open(f_home)
+        HOME_TMP = []
+        printlog(1, 'Reload Home DG-ID from File')
+        for row in file:
+          content = row.strip()
+          # valid line (not a comment)
+          if ((len(content) > 3) and (content[0] != '#')):
+            c_split = content.split(':')
+            if (len(c_split) == 3):
+              try:
+                dgid_int = int(c_split[1])
+                dgid_time = int(c_split[2])
+              except:
+                dgid_int = 0
+              # valid record  
+              if (dgid_time == 0):
+                dgid_time = 15  
+              if ((dgid_int in dgid_list) and (dgid_int > 0)):
+                HOME_TMP.append([c_split[0], dgid_int, dgid_time*60])
+              else:
+                printlog(1,'Invalid record in Home file' )
+        file.close() 
+      except Exception as ex:
+        printlog(2, 'Failed to load Home DG-ID from File ' + str(ex) )
+      GW_HOME = HOME_TMP.copy()
+      f_time_old = f_time
+      for c in cli:
+        found = False
+        for g in GW_HOME:
+          if (g[0] == c[2]):
+            found = True
+            if (g[2] < 0):
+              lock_nodi.acquire()
+              c[12] = 0
+              c[13] = 0
+              c[14] = 0
+              c[8] = g[1]
+              c[9] = -2
+              lock_nodi.release()
+            else:
+              lock_nodi.acquire()
+              c[12] = g[1]
+              c[13] = g[2]
+              lock_nodi.release()
+            break  
+        if not found:
+          lock_nodi.acquire()
+          c[12] = 0
+          c[13] = 0
+          c[14] = 0
+          if (c[9] == -2):
+            c[9] = 0
+          lock_nodi.release()         
+    else:
+      pass
+    time.sleep(t_reload)        
+
+
+
+def blacklist(f_bl, t_reload, cli):
+  global BLACK_LIST
+  global WHITE_LIST
+  global GW_BL
+  global IP_BL
+  global GW_LK
+  global IP_LK 
+  global SUF_BL
+  global SN_BL 
+
+  f_time_old = 0
+  try:
+    f_time = os.stat(f_bl).st_mtime
+  except:
+    pass
+    
+  while True:
+    f_time = os.stat(f_bl).st_mtime
+    if (f_time != f_time_old):
+      try:
+        file = open(f_bl)
+        BL_TMP = []
+        GW_TMP = []
+        IP_TMP = []
+        WL_TMP = []
+        GW_LK_TMP = []
+        IP_LK_TMP = []
+        SUF_BL_TMP = []
+        SN_BL_TMP = []
+        printlog(1, 'Reload the Blacklist from File')
+        for row in file:
+          content = row.strip()
+          
+          # valid line (not a comment)
+          if ((len(content) > 3) and (content[0] != '#')):
+            c_split = content.split(':')
+            for i in range(len(c_split)):
+              c_split[i] = c_split[i].strip()
+              
+            # CALL
+            if (len(c_split) == 1 or c_split[0] == 'CS'):
+              if (len(c_split) == 1):
+                cont = content
+              if (c_split[0] == 'CS'):
+                cont = c_split[1] 
+              if ((len(cont) <= 8) and (len(cont) >= 3)):
+                if (not inlist(BL_TMP, cont)):
+                  bisect.insort(BL_TMP,cont)
+            
+            # WL      
+            if (len(c_split) == 2 and c_split[0] == 'AL'):      
+              if (not inlist(WL_TMP, c_split[1])):
+                bisect.insort(WL_TMP,c_split[1])
+                  
+            # GW      
+            if (len(c_split) == 2 and c_split[0] == 'GW'):      
+              if (not inlist(GW_TMP, c_split[1])):
+                bisect.insort(GW_TMP,c_split[1])
+                
+            # GWB      
+            if (len(c_split) == 2 and c_split[0] == 'GWB'):      
+              if (not inlist(GW_LK_TMP, c_split[1])):
+                bisect.insort(GW_LK_TMP,c_split[1])              
+           
+           # SUF      
+            if (len(c_split) == 2 and c_split[0] == 'SB'):      
+              if (not inlist(SUF_BL_TMP, c_split[1])):
+                bisect.insort(SUF_BL_TMP,c_split[1])       
+           
+           # SN      
+            if (len(c_split) == 2 and c_split[0] == 'SN' and len(c_split[1]) == 5):      
+              if (not inlist(SN_BL_TMP, c_split[1])):
+                bisect.insort(SN_BL_TMP,c_split[1])       
+                
+            # IP      
+            if (len(c_split) == 2 and c_split[0] == 'IP'):      
+              try:
+                ipa = socket.gethostbyname(c_split[1])
+                ipl = ip2long(ipa)
+              except:
+                ipl = 0
+                printlog(2, 'Invalid hostname ' + c_split[1])
+              if (ipl > 0):  
+                if (not inlist(IP_TMP, ipl)):
+                  bisect.insort(IP_TMP, ipl)
+            
+             # IPB      
+            if (len(c_split) == 2 and c_split[0] == 'IPB'):      
+              try:
+                ipa = socket.gethostbyname(c_split[1])
+                ipl = ip2long(ipa)
+              except:
+                ipl = 0
+                printlog(2, 'Invalid hostname ' + c_split[1])
+              if (ipl > 0):  
+                if (not inlist(IP_LK_TMP, ipl)):
+                  bisect.insort(IP_LK_TMP, ipl)
+                          
+        file.close() 
+      except Exception as ex:
+        printlog(2, 'Failed to load Blacklist from File ' + str(ex) )
+      BLACK_LIST = BL_TMP.copy()
+      WHITE_LIST = WL_TMP.copy()
+      GW_BL = GW_TMP.copy()
+      IP_BL = IP_TMP.copy()
+      GW_LK = GW_LK_TMP.copy()
+      IP_LK = IP_LK_TMP.copy()
+      SUF_BL = SUF_BL_TMP.copy()
+      SN_BL = SN_BL_TMP.copy()
+      printlog(1, 'Loaded ' + str(len(BLACK_LIST)) + '/CS ' + str(len(WHITE_LIST)) + '/AL ' + str(len(GW_BL)) + '/GW ' + str(len(IP_BL)) + '/IP ' + str(len(GW_LK)) + '/GWB ' + str(len(IP_LK)) + '/IPB ' + str(len(SUF_BL)) + '/SB ' + str(len(SN_BL)) + '/SN')
+      f_time_old = f_time
+      update_clients(cli)
+    else:
+      pass
+    time.sleep(t_reload)
+
+def ini2list(ls):
+  li = list(ls.split(','))
+  valid = False
+  l=[]
+  for c in li:
+    valid = True  
+    try:  
+      y = int(c)
+      if ((y > 0) and (y < 100)):
+        l.append(y)
+      else:
+        valid = False
+        break
+    except:
+      valid = False
+      break
+  if valid:
+    return l
+  else:
+    return []
+    
+
+def aux_port_list(s):
+  port_list = []
+  if (len(s) > 3):
+    for i in s.split(','):
+      try:
+        i_str = i.split(':')
+        port_list.append([int(i_str[0]), int(i_str[1])])
+      except:
+        printlog(1, 'Error reading aux port list')       
+  return(port_list)
+
+      
+
+## reading configuration file ##
+def ReadConfig(f,p,ra):
+  config = configparser.ConfigParser()
+  
+  config_file = f.strip()
+  config.read(config_file)
+  name = config['Info']['Name'] 
+  description = config['Info']['Description']
+  try:
+    id = int(config['Info']['id'])
+  except:
+    id = 0
+  try:
+    contact = config['Info']['Contact']
+  except:
+    contact = ''
+    
+  try:
+    web = config['Info']['Web']
+  except:
+    web = ''
+    
+  log_path = config['Log']['FilePath']
+  log_name = config['Log']['FileRoot']
+  try:
+    file_rotate = config['Log']['FileRotate']
+  except:
+    file_rotate = "1" # to keep file-rotation by default with timestamp
+  
+  try:
+    display_level = int(config['Log']['DisplayLevel'])
+  except:
+    display_level = 1
+    
+  try:
+    file_level = int(config['Log']['FileLevel'])
+  except:
+    file_level = 1
+
+  #try:
+  #  en_ext_cmd = int(config['Log']['EnableExtendedCommands'])
+  #except:
+  en_ext_cmd = 0 # extended commands not present in this version (3)
+ 
+  try:
+    port = int(config['Network']['Port'])
+  except:
+    port = 42000
+      
+  try:
+    IP = config['Network']['IP']
+  except:
+    IP = '0.0.0.0'
+    
+  try:
+    json_port = int(config['Network']['Json_Port'])
+  except:
+    json_port = port + 1
+    
+  try:
+    json_IP = config['Network']['Json_IP']
+  except:
+    json_IP = '127.0.0.1'
+    
+  try:  
+    file_blacklist = config['Block List']['File']
+  except:
+    file_blacklist = ''
+
+  try:  
+    CheckRE = int(config['Block List']['CheckRE'])
+    if (CheckRE > 1):
+      CheckRE = 1
+    if (CheckRE < -1):
+      CheckRE = -1
+  except:
+    CheckRE = 1
+  
+  try:
+    t_reload_blacklist = float(config['Block List']['Time'])
+  except:
+    t_reload_blacklist = 5.0
+  if (t_reload_blacklist < 0.1):
+    t_reload_blacklist = 0.1
+  
+  try:
+    debug = int(config['Network']['Debug'])
+    if (debug >= 1):
+      debug = 1
+    if (debug < 1):
+      debug = 0
+  except:
+    debug = 0
+    
+  try:
+    timeout = float(config['Protections']['Timeout'])
+  except:
+    timeout = 240.0
+
+  try:
+    treactivate = float(config['Protections']['Treactivate'])
+  except:
+    treactivate = 1800.0  
+  
+  try:
+    wildptttime = float(config['Protections']['WildPTTTime'])
+  except:
+    wildptttime = 5.0  
+      
+  try:
+    wildpttcount = int(config['Protections']['WildPTTCount'])
+  except:
+    wildpttcount = 3  
+
+  try:
+    aprs_en = int(config['APRS']['enable'])
+    if (aprs_en >= 1):
+      aprs_en = 1
+    if (aprs_en < 1):
+      aprs_en = 0
+  except:
+    aprs_en = 0
+
+  aprs_server = config['APRS']['server']
+
+  try:
+    aprs_port = int(config['APRS']['port'])
+  except:
+    aprs_port = 14580
+    
+  aprs_ssid = config['APRS']['ssid']   
+  
+  if (aprs_ssid == '-0'):
+    aprs_ssid = ''   
+
+  try:
+    dgid_default = int(config['DGID']['default'])
+  except:
+    dgid_default = 22
+
+  try:
+    dgid_local = int(config['DGID']['local'])
+  except:
+    dgid_local = 1
+    
+  dgid_database = config['DGID']['database'] 
+  home_db = config['DGID']['home'] 
+  
+  dgid_list = ini2list(config['DGID']['list'])
+  
+  aux_port_list = config['DGID']['aux_port']
+
+  try:
+    prefix = int(config['DGID']['prefix'])
+  except:
+    prefix = 1  
+
+  try:
+    for (key, val) in config.items('REFL_ALIAS'):
+        val_split = val.split(',')
+        if (len(val_split) == 4):
+         if (val_split[0].strip().isnumeric() and val_split[1].strip().isnumeric()):
+             dgid = int(val_split[0])
+             if ((dgid > 0) and (dgid < 100)):
+               id_ref = int(val_split[1])
+               name_ref = val_split[2][:16].strip() 
+               desc_ref = val_split[3][:14].strip()
+                 
+               if ((id_ref > 0) and (id_ref < 1000000)):
+                 refl_id = str(id_ref).zfill(5)
+               else:  
+                 refl_id = CalcID(name_ref)
+               ra.append([dgid, refl_id, name_ref, desc_ref])
+  except Exception as ex:
+    printlog(1,'Error Reading REFL_ALIAS Section: ' + str(ex))
+
+
+  p.append(id)                 # 0
+  p.append(name)               # 1
+  p.append(description)        # 2
+  p.append(log_path)           # 3
+  p.append(log_name)           # 4
+  p.append(port)               # 5
+  p.append(file_blacklist)     # 6
+  p.append(t_reload_blacklist) # 7
+  p.append(file_rotate)        # 8
+  p.append(CheckRE)            # 9
+  p.append(en_ext_cmd)         #10
+  p.append(display_level)      #11
+  p.append(file_level)         #12
+  p.append(debug)              #13
+  p.append(timeout)            #14
+  p.append(treactivate)        #15
+  p.append(wildptttime)        #16
+  p.append(wildpttcount)       #17
+  p.append(aprs_en)            #18
+  p.append(aprs_server)        #19
+  p.append(aprs_port)          #20
+  p.append(aprs_ssid)          #21
+  p.append(IP)                 #22
+  p.append(json_IP)            #23
+  p.append(json_port)          #24  
+  p.append(contact)            #25  
+  p.append(web)                #26
+  p.append(dgid_default)       #27
+  p.append(dgid_database)      #28
+  p.append(dgid_local)         #29
+  p.append(dgid_list)          #30
+  p.append(aux_port_list)      #31
+  p.append(home_db)            #32
+  p.append(prefix)             #33    
+  
+    
+def sanitize_msg(data):
+  bya_msg = bytearray(data)
+
+  if ((data[0:4] == b"YSFP") and (len(data) == 14)):
+    for i in range(10):
+      if (bya_msg[i+4] == 0):
+        bya_msg[i+4] = 32      
+
+  if ((data[0:4] == b"YSFD") and (len(data) == 155)):
+    for i in range(30):
+      if (bya_msg[i+4] == 0):
+        bya_msg[i+4] = 32
+
+  return(bytes(bya_msg))
+
+
+def aprs_send_data(server, user, port):
+  global APRS_STR
+  while True:
+    s = APRS_STR.get()
+    printlog(1, 'APRS string: ' + s)
+    try:
+      ysfaprs.send_aprs(s, server, user, port)
+    except:
+      printlog(1, 'Impossible to send APRS data')
+    
+    time.sleep(5.0)
+
+def json_send(q,s,cl): #queue, socket, clients
+  while True:
+    try:                                       
+      mess = q.get()
+      for c in cl:
+        # printlog(1, 'send ' + mess + ' at ' + str(c[0]) + ':' + str(c[1])) 
+        s.sendto(str.encode(mess), (c[0], c[1])) 
+    except Exception as e:
+      printlog(1, 'Error in json_send ' + str(e))        
+            
+def json_recv(q,s,cl):
+  global version
+  global refl_id
+  global refl_name
+  global refl_desc
+  global aprs_en
+  global aprs_ssid
+  global refl_contact
+  global refl_web
+  global dgid_local
+  global dgid_default
+  global dgid_list
+    
+  while True:
+    try:
+      data,addr = s.recvfrom(1024)    
+      if (data == b'CONNREQ'):
+        pres = False
+        for c in cl:
+          if ((c[0] == addr[0]) and (c[1] == addr[1])):
+            pres = True
+            break   
+        if (not pres):
+          cl.append([addr[0], addr[1], 0])
+          printlog(1, 'added json client: ' + str(addr)) 
+          connstr = 'CONNOK:' + str(addr[0]) + ':' + str(addr[1]) 
+          s.sendto(str.encode(connstr), addr)
+          q.put('{"system": "pYSFReflector3", "ver": "' + version + '", "REF_ID": "' + str(refl_id).zfill(5) + '", "REF_NAME": "' + refl_name + '", "REF_DESC": "' + refl_desc + '", "APRS_EN": "' + str(aprs_en) + '", "APRS_SSID": "' + aprs_ssid + '", "contact": "' + refl_contact + '", "web": "' + refl_web + '", "dgid_loc": "' + str(dgid_local) + '", "dgid_def": "' + str(dgid_default) + '", "dgid_list": "' + str(dgid_list) + '"}')
+      if (data == b'PING'):  
+        for c in cl:
+          if ((c[0] == addr[0]) and (c[1] == addr[1])):
+            s.sendto(b'PONG', addr)
+            # printlog(1, 'PING from: ' + str(addr)) 
+            c[2] = 0
+            break
+      if (data == b'BYE'):  
+        for c in cl:
+          if ((c[0] == addr[0]) and (c[1] == addr[1])):
+            printlog(1, 'Removing json client ' + c[0] + ':' + str(c[1]) + ' unlinked')
+            connstr = 'BYE:' + str(addr[0]) + ':' + str(addr[1]) 
+            s.sendto(str.encode(connstr), addr)
+            cl.remove(c)
+            break
+            
+              
+    except Exception as e:
+      printlog(1, 'Error in json_recv ' + str(e))             
+
+def dgid_static(gw):
+  s = gw.split('-')
+  i = 0
+  if (len(s) == 2):
+    try:
+      i = int(s[1])
+    except:
+      pass
+  return i
+
+
+    
+def RunServer(config):
+    global filelog
+    global version
+    global BLACK_LIST
+    global GW_BL
+    global IP_BL
+    global GW_LK                                            
+    global IP_LK
+    global BLK_TMP
+    global debug
+    global APRS_STR
+    global lock_tx
+    global lock_nodi
+    global refl_id
+    global refl_name
+    global refl_desc
+    global aprs_en
+    global aprs_ssid
+    global SN_BL
+    global refl_contact
+    global refl_web
+    global dgid_local
+    global dgid_default
+    global dgid_list
+    global REF_ALIAS
+    global GW_HOME
+
+    print('Starting pYSFReflector-' + version)
+    printlog(4, 'Starting pYSFReflector-' + version)
+    
+    host = config[22]   
+    port = config[5]
+      
+    sock_port = aux_port_list(config[31])
+    sock_list = []
+    sock_port.insert(0, [0, port])
+
+    # multiple socket
+    for s_i in sock_port:
+      s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+      s.setblocking(1)
+      s.bind((host,s_i[1]))
+      sock_list.append([s, s_i[0]])
+      printlog(1,'Add port ' + str(s_i[1]) + ' linked to DG-ID ' + str(s_i[0]))
+   
+    
+    # socket for json output
+    json_host = config[23]
+    json_port = config[24]
+    
+      
+    sjson = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    sjson.setblocking(1)
+    sjson.bind((json_host,json_port))
+    
+    
+    clients_json = []
+    clients = []   # addr, port, gw, t_corr, ID, lonly, t_conn, locked, DG-ID, T_hold, busy, socket, dg-id_home, time_home, time_home_act
+    c = []
+    rx_lock = []
+    rx_lock_tout = {}
+            
+    id = 1  # id gw
+    # stream
+    tx = [0, 0, '', '', '', 0, 0, 0.0, 0.0, 0, 0, '', '', 0, False,'',0]  # id_gw, tout, gateway, src, dest, id_stream, start_time, lat, long, DG-ID, local, rem12, rem34, radio_code, coord_send, src_clean, stream type
+    
+    # list of stream
+    STR = []
+    
+    refl_name = config[1][:16]
+    refl_desc = config[2][:14]
+    
+    if ((config[0] > 0) and (config[0] < 1000000)):
+      refl_id = str(config[0]).zfill(5)
+    else:  
+      refl_id = CalcID(refl_name)
+    
+    f_blacklist = config[6]
+    tr_blacklist = config[7] * 60.0
+    
+    CheckRE = config[9]
+    
+    # not present in this version
+    en_ext_cmd = False
+    
+    timeout = config[14]
+    treactivate = config[15]
+    
+    wptttime = config[16]
+    wpttcount = config[17]
+    
+    aprs_en = config[18]
+    aprs_server = config[19]
+    aprs_port = config[20]
+    aprs_ssid = config[21]
+    
+    refl_contact = config[25]
+    refl_web = config[26]
+    
+    dgid_default = config[27]
+    dgid_database = config[28]
+    dgid_local = config[29]
+    dgid_list = config[30]
+    f_homedb = config[32]
+    dgid_prefix = config[33]
+    
+    recvPackets = queue.Queue()
+    
+    # queue for json messages
+    json_mess = queue.Queue()
+
+    try:
+      db = TinyDB(dgid_database)
+      qry = Query()
+    except Exception as e:
+      printlog(1, 'Impossible open db ' + str(e))
+
+    gps_data = []
+        
+    for s in sock_list:
+      threading.Thread(target=RecvData,args=(s,recvPackets)).start()
+    
+    threading.Thread(target=ElencoNodi,args=(clients,json_mess)).start()
+    threading.Thread(target=TimeoutNodi,args=(clients,)).start()
+    threading.Thread(target=json_recv,args=(json_mess,sjson,clients_json)).start()
+    threading.Thread(target=json_send,args=(json_mess,sjson,clients_json)).start()
+    threading.Thread(target=TimeoutNodiJS,args=(clients_json,)).start()
+    threading.Thread(target=TimeoutTX,args=(STR, rx_lock_tout, rx_lock, timeout, treactivate, json_mess)).start()
+    threading.Thread(target=scheduler,args=[]).start()
+    if (len(f_blacklist) > 0):
+      threading.Thread(target=blacklist,args=(f_blacklist,tr_blacklist,clients)).start()
+    if aprs_en:
+      threading.Thread(target=aprs_send_data,args=(aprs_server, 'YSF' + str(refl_id).zfill(5), aprs_port)).start()
+    if (len(f_homedb) > 0):
+      threading.Thread(target=homedb,args=(f_homedb,tr_blacklist,clients,dgid_list)).start()
+    
+    time_start = time.time()
+    
+    
+    while True:
+      try:                                       # protection from errors in infinite loop
+            data_ns, addr, sock = recvPackets.get()    # blocked if queue is empty
+            s = sock[0]
+            # printlog(1,'Socket ID: ' + str(sock[1]))
+            data = sanitize_msg(data_ns)
+            cmd = data[0:4]
+            
+            if debug == 1:
+              hex_dump(data)
+
+            if (cmd == b'YSFP'):
+              pres = False
+              for c in clients:
+                if ((c[0] == addr[0]) and (c[1] == addr[1]) and (c[11].getsockname()[0] == s.getsockname()[0]) and (c[11].getsockname()[1] == s.getsockname()[1])):
+                  pres = True
+                  lock_nodi.acquire()
+                  c[3] = 0
+                  lock_nodi.release()
+                  break
+              if not pres:  
+                lonly = 0
+                locked = 0
+                if inlist(GW_BL, (data[4:14]).decode().strip()):
+                  lonly = 1
+                if inlist(IP_BL, ip2long(addr[0])):
+                  lonly = 1 
+                if inlist(GW_LK, (data[4:14]).decode().strip()):
+                  locked = 1
+                  lonly = 1
+                if inlist(IP_LK, ip2long(addr[0])):
+                  locked = 1 
+                  lonly = 1
+                # new gateway 
+                t_hold = 0 
+                dgid_home = 0
+                dgid_time = 0
+                if (sock[1] > 0):
+                  dgid = sock[1]
+                else:    
+                  dgid = dgid_static((data[4:14]).decode().strip())
+                if ((dgid > 0) and (dgid in dgid_list)):
+                  t_hold = -1
+                  printlog(1, 'Static DG-ID (' + str(dgid) + ') via port or gw name')
+                else:                                                                          
+                  for g in GW_HOME:
+                    if (g[0] == data[4:14].decode().strip()):
+                      if (g[2] < 0):       # gw fixed
+                        dgid = g[1]
+                        dgid_home = 0
+                        dgid_time = 0
+                        t_hold = -2
+                        printlog(1, 'Static DG-ID (' + str(dgid) + ') via back to home')
+                      else:                # gw with back to home active
+                        dgid_home = g[1]
+                        dgid = g[1]
+                        dgid_time = g[2]
+                      break
+                  if (dgid_home == 0) and (t_hold == 0):      
+                    if db.contains(qry.gateway == (data[4:14]).decode().strip()):
+                      dgid = int(db.search(qry.gateway == (data[4:14]).decode().strip())[0]['dgid'])
+                    else:
+                      dgid = dgid_default
+                
+                if (not(dgid in dgid_list)):
+                  printlog(1, 'Invalid DG-ID (' + str(dgid) + ') changed to default (' + str(dgid_default) + ')')
+                  dgid = dgid_default
+                  t_hold = 0
+                  
+                c=[addr[0], addr[1], (data[4:14]).decode().strip(), 0, id, lonly, time.time(), locked, dgid, t_hold, 0, sock[0], dgid_home, dgid_time, 0]
+                id += 1
+                clients.append(c)
+                printlog(1, 'Adding ' + c[2].ljust(10) + ' (' + c[0] + ':' + str(c[1]) + ') DG-ID ' + str(dgid))
+              s.sendto(b'YSFPREFLECTOR ',addr)
+           
+            if (cmd == b'YSFU'):
+              for c in clients:
+                if ((c[0] == addr[0]) and (c[1] == addr[1]) and (c[11].getsockname()[0] == s.getsockname()[0]) and (c[11].getsockname()[1] == s.getsockname()[1])):
+                  printlog(1, 'Removing ' + c[2].ljust(10) + ' (' + c[0] + ':' + str(c[1]) + ') unlinked')
+                  clients.remove(c)
+                  break
+              
+            if ((cmd == b'YSFD') and (len(data) == 155)):
+              #print(data)                                     
+              ba_data = bytearray(data)
+              data_mod = bytearray(data) 
+              gw_tx = []
+              for c in clients:                                 
+                if ((c[0] == addr[0]) and (c[1] == addr[1]) and (c[11].getsockname()[0] == s.getsockname()[0]) and (c[11].getsockname()[1] == s.getsockname()[1])):
+                  gw_tx = c
+                  lock_nodi.acquire()
+                  gw_tx[14] = 0
+                  lock_nodi.release()
+                  break
+              
+              
+              if (gw_tx):
+                  tx = [0, 0, '', '', '', 0, 0, 0.0, 0.0, 0, 0, '', '', 0, False,'', 0, 0, 0, 0]
+                  # source 
+                  tx[3] = data[14:24].decode().strip()
+                  tx[15] = re.split(r'[-/]', tx[3].strip())[0]
+                  dgid_busy = False
+                  for st in STR:
+                    if (st[9] == gw_tx[8]):
+                      dgid_busy = True
+                    if (((st[9] == gw_tx[8]) and (st[0] == gw_tx[4])) or ((gw_tx[8] == dgid_local) and (st[9] == -gw_tx[4])) ):
+                      tx = st
+                      rem12 = tx[11]
+                      rem34 = tx[12]
+                      radio_code = tx[13]
+                      coord_send = tx[14]
+                      break
+                      
+                  if ysffich.decode(data[40:]): 
+                    FI = ysffich.getFI()
+                    FT = ysffich.getFT()
+                    FN = ysffich.getFN()
+                    DT = ysffich.getDT()
+                    SQL = ysffich.getSQ()
+                    dch = ''
+                    if (FI == 0):  # header     
+                      gps_data = [0] * (FT - 5) * 10
+                      gps.gps_reset()
+                      hc_ok = ysfpayload.processheaderdata(data[35:])
+                      if (hc_ok == False):
+                        printlog(1, 'Error processing HC data: ' +  data[14:24].decode().strip().ljust(10) + ' at ' + data[4:14].decode().strip().ljust(10))
+                      else:
+                        # header ok
+                        if (dgid_prefix > 0):
+                          data_p = ba_data[35:]
+                          csd1 = ((ysfpayload.m_dest).ljust(10) + (str(gw_tx[8]) + '/' + tx[15]).ljust(10)).encode()
+                          csd2 = (ysfpayload.m_downlink.ljust(10) + ysfpayload.m_uplink.ljust(10)).encode()
+                          ysfpayload.writeHeader(data_p, csd1, csd2)
+                          data_mod = bytearray(155)
+                          data_mod[:35] = ba_data[:35]
+                          data_mod[35:] = data_p  
+                    else:
+                      if ((FN == 1) and (DT == 2) and (dgid_prefix > 0)):
+                        data_p = ba_data[35:]
+                        src = (str(gw_tx[8]) + '/' + tx[15].strip()).ljust(10).encode()
+                        ysfpayload.writeVDMmode2Data(data_p, src)
+                        data_mod = bytearray(155)
+                        data_mod[:35] = ba_data[:35]
+                        data_mod[35:] = data_p  
+                    if ((FI == 1) and (DT == 2) and (tx[0] != 0)):
+                      dt = [0] * 10
+                      if ysfpayload.readDataVDModeData2(data[35:], dt):
+                        dch = ysfutils.list_to_string(dt)
+                        if (FN == 4):
+                          dch_s = dch.strip() 
+                          if ((len(dch_s) > 0) and (dch_s != rem12)):
+                            rem12 = dch_s
+                            printlog(1, '<' + str(tx[5]).zfill(7) + '> Additional information Rem1+2:' +  dch)
+                            json_mess.put('{"stream_id01": "' + str(tx[5]).zfill(7) + '", "Rem1+2": "' + dch + '"}')
+                        if (FN == 5):
+                          dch_s = dch.strip()
+                          if ((len(dch_s) > 0) and (dch_s != rem34)):
+                            rem34 = dch_s
+                            printlog(1, '<' + str(tx[5]).zfill(7) + '> Additional information Rem3+4:' +  dch)  
+                            json_mess.put('{"stream_id02": "' + str(tx[5]).zfill(7) + '", "Rem3+4": "' + dch + '"}')
+                        if ((FN == 6) or (FN == 7)):
+                          gps_data[(FN - 6) * 10:(FN - 5) * 10] = dt
+                          if ((FN == FT) and (len(gps_data) > 0)):
+                            # printlog(1,str(gps_data))
+                            if gps.GPS_dec(gps_data, FT):
+                              if ((gps.radio_code != 0) and (gps.radio_code != radio_code)):
+                                radio_code = gps.radio_code
+                                printlog(1, '<' + str(tx[5]).zfill(7) + '> Additional information radio code:' +  str(radio_code))
+                                json_mess.put('{"stream_id03": "' + str(tx[5]).zfill(7) + '", "radio_code": "' + str(radio_code) + '"}')
+                              if ((tx[7] == 999.0) and (gps.latitude != 999.0)):
+                                lock_tx.acquire()
+                                tx[7] = gps.latitude
+                                lock_tx.release()
+                              if ((tx[8] == 999.0) and (gps.longitude != 999.0)):
+                                lock_tx.acquire()
+                                tx[8] = gps.longitude
+                                lock_tx.release()
+                              
+                              if ((tx[7] != 999.0) and (tx[8] != 999.0) and (not coord_send)):
+                                json_mess.put('{"stream_id04": "' + str(tx[5]).zfill(7) + '", "latitude": "' + str(tx[7]) + '", "longitude": "' + str(tx[8]) + '"}')
+                                coord_send = True
+                              
+                          # print("{:.6f}".format(gps.latitude) + ' ' + "{:.6f}".format(gps.longitude))
+                        tx[11] = rem12
+                        tx[12] = rem34
+                        tx[13] = radio_code
+                        tx[14] = coord_send
+                      else:
+                        dch = ''   
+                         
+                    # print('DT: ' + str(ysffich.getDT()) + ' FI: ' + str(ysffich.getFI()) + ' FN/FT: ' + str(ysffich.getFN()) + '/' + str(ysffich.getFT()) + ' DCH: ' + dch)
+                    id_corr = gw_tx[4] 
+                    gw_corr = gw_tx[2]
+                    tx_ok = True
+                    if (tx[0] == 0):
+                      if ((DT == 1) and ((FT == 1) or (FT == 2))):
+                        tx_ok = False
+                        block_r = 'DT'
+                      else:
+                        if (inlist(GW_BL, gw_corr) or inlist(GW_LK, gw_corr)):
+                          tx_ok = False
+                          block_r = 'GW'
+                        else:
+                          if (inlist(IP_BL, ip2long(addr[0])) or inlist(IP_LK, ip2long(addr[0]))):
+                            tx_ok = False
+                            block_r = 'IP'      
+                          else:
+                            if ((ysffich.getCM() == 1) and (len(ysfpayload.m_dest) == 10) and (ysfpayload.m_dest != '**********') and (inlist(SN_BL, ysfpayload.m_dest[5:10]))):
+                              tx_ok = False
+                              block_r = 'SN'
+                            else:
+                              tx_ok = canTrasmit(data[14:24].decode().strip(), CheckRE)
+                              block_r = 'CS'
+                    
+                    if tx_ok:
+                       # DG-ID mangement
+                      if ((SQL in dgid_list) and (FI == 0)):
+                        if ((SQL != gw_tx[8]) and (gw_tx[9] == 0) and (sock[1] == 0)):  
+                          printlog(1, 'Changed DG-ID for ' + gw_tx[2] + ' from ' + str(gw_tx[8]) + ' to ' + str(SQL))
+                          gw_tx[8] = SQL
+                          tx[16] = 1  # DG-ID change
+                          tx[10] = 1  # local
+                          if db.contains(qry.gateway == gw_tx[2]):
+                            db.update({'dgid':  str(SQL)}, qry.gateway == gw_tx[2])
+                          else:
+                            db.insert({'gateway': gw_tx[2], 'dgid':  str(SQL)})
+                      else:
+                        if ((SQL != 0) and (FI == 0)):
+                          printlog(1, 'Invalid DG-ID (' + str(SQL) + ')') 
+                      if ((tx[0] == 0) and (id_corr != 0) and (FI == 0) and (SQL != 127) and ((dgid_busy == False) or (gw_tx[8] == dgid_local))): 
+                        lock_tx.acquire()
+                        tx[0] = id_corr
+                        tx[1] = 0
+                        # gateway
+                        tx[2] = data[4:14].decode().strip()
+                        # src
+                        tx[3] = data[14:24].decode().strip()
+                        tx[15] = re.split(r'[-/]', tx[3].strip())[0]
+                        # dest
+                        tx[4] = data[24:34].decode().strip() 
+                        # stream ID
+                        tx[5] = random.randint(0, 9999999) 
+                        # time start
+                        tx[6] = time.time()
+                        # latitude and longitude
+                        tx[7] = 999.0
+                        tx[8] = 999.0
+                        if (gw_tx[8] == dgid_local):
+                          # local
+                          tx[9] = -tx[0]
+                          tx[10] = 1
+                        else:  
+                          tx[9] = gw_tx[8]
+                        lock_tx.release() 
+                        STR.append(tx)
+                        if (not hc_ok):
+                          printlog(1, '<' + str(tx[5]).zfill(7) + '> Stream opened with invalid HC')  
+                        if ((len(ysfpayload.m_dest) == 0) or (ysfpayload.m_dest == '**********')):  
+                          dst = tx[4].ljust(10)
+                        else:
+                          dst = ysfpayload.m_dest.ljust(10) 
+                        fich_str = 'FICH-Data: CS:' + str(ysffich.getCS()) + ' | CM:' + str(ysffich.getCM()) + ' | FT:' + str(ysffich.getFT()) + ' | Dev:' + str(ysffich.getDev()) + ' | MR:' + str(ysffich.getMR()) + ' | VoIP:' + str(ysffich.getVoIP()) + ' | DT:' + str(ysffich.getDT()) + ' | SQL:' + str(ysffich.getSQL()) + ' | SQC:' + str(ysffich.getSQ()) 
+                        fich_str_json = '"CS": "' + str(ysffich.getCS()) + '", "CM": "' + str(ysffich.getCM()) + '", "FT": "' + str(ysffich.getFT()) + '", "Dev": "' + str(ysffich.getDev()) + '", "MR": "' + str(ysffich.getMR()) + '", "VoIP": "' + str(ysffich.getVoIP()) + '", "DT": "' + str(ysffich.getDT()) + '", "SQL": "' + str(ysffich.getSQL()) + '", "SQC": "' + str(ysffich.getSQ()) + '"'
+                        printlog(1, '<' + str(tx[5]).zfill(7) + '> Received data from ' + tx[3].ljust(10) +   ' to ' +  dst + ' at ' +  tx[2].ljust(10)+ ' ' + fich_str)
+                        json_mess.put('{"stream_start": "' + str(tx[5]).zfill(7) + '", "call": "' + tx[3] + '", "target": "' + dst + '", "gw": "' +  tx[2] + '",  "dgid": "' +  str(tx[9]) + '", "time": "' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '", ' + fich_str_json + '}')
+                        printlog(1, '<' + str(tx[5]).zfill(7) + '> Additional information dst:' +  ysfpayload.m_dest.ljust(10) + ' src:' +  ysfpayload.m_source.ljust(10) + ' uplink:' + ysfpayload.m_uplink.ljust(10) + ' downlink:' + ysfpayload.m_downlink.ljust(10))
+                        json_mess.put('{"stream_id05": "' + str(tx[5]).zfill(7) + '", "dst": "' + ysfpayload.m_dest + '", "src": "' + ysfpayload.m_source + '", "uplink": "' +  ysfpayload.m_uplink + '", "downlink": "' + ysfpayload.m_downlink + '"}')
+                        ckeck_wild_ptt(tx[3], wptttime, wpttcount, treactivate, json_mess)
+                    else:
+                      if (id_corr not in rx_lock):
+                        rx_lock.append(id_corr)  
+                        printlog(1, 'Data from ' + data[14:24].decode().strip().ljust(10) + ' at ' + data[4:14].decode().strip().ljust(10) + ' blocked/' + block_r)
+                        json_mess.put('{"blocked": "-1", "CS": "' + data[14:24].decode().strip().ljust(10) + '", "GW": "' + data[4:14].decode().strip().ljust(10) + '", "BR": "' +  block_r +'", "time": "' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
+                      rx_lock_tout[id_corr] = 0  
+                    
+                    if ((id_corr == tx[0]) and (id_corr != 0)):    
+                      lock_tx.acquire()
+                      tx[1] = 0
+                      lock_tx.release()
+                   
+                    if (tx[10] == 0):
+                      for c in clients:
+                        if (((c[0] != addr[0]) or (c[1] != addr[1]) or (c[11].getsockname()[0] != s.getsockname()[0]) or (c[11].getsockname()[1] != s.getsockname()[1])) and (id_corr == tx[0]) and (id_corr != 0) and (id_corr not in rx_lock) and (c[7] == 0) and (c[8] == gw_tx[8])):
+                          try:
+                           # lock_nodi.acquire()
+                           # c[14] = 0
+                           # lock_nodi.release()
+                            if (c[9] < 0):                        
+                              c[11].sendto(data,(c[0], c[1]))
+                            else:
+                              #s.sendto(data,(c[0], c[1]))
+                              c[11].sendto((data_mod),(c[0], c[1]))  
+                          except:
+                            printlog(1, 'Error sending data')        
+                  
+                    if ((FI == 2) and (tx[0] == id_corr) and (tx[0] !=0)):
+                      printlog(1, '<' + str(tx[5]).zfill(7) + '> Received end of transmission coords: ' + "{:.6f}".format(tx[7]) + ', ' + "{:.6f}".format(tx[8]))
+                      STR.remove(tx)
+                      if (tx[16] == 1):
+                        type_ch = 'TD'
+                      else:
+                        type_ch = 'TC'  
+                      json_mess.put('{"stream_end": "' + str(tx[5]).zfill(7) + '", "type": "' + type_ch + '", "time": "' +  str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
+                      if (aprs_en and ((tx[7] != 999.0) or (tx[8] != 999.0))):
+                        s_aprs = ysfaprs.aprs_string(re.split(r'[-/]', tx[3].strip())[0], tx[7], tx[8], radio_code, str(refl_id).zfill(5), aprs_ssid)
+                        if (len(s_aprs) > 5):
+                          APRS_STR.put(s_aprs)
+                      gps.gps_reset()
+                  else:
+                    printlog(1, 'Error decoding FICH')    
+              
+              else:
+                printlog(1, 'Received YSFD frame from unknown gateway')              
+              
+            if (cmd == b'YSFS'):
+              printlog(1, 'YSF server status enquiry from ' + addr[0] + ':' + str(addr[1]) + ' for DG-ID ' + str(sock[1]))
+              if (len(clients) > 999):
+                num_cli = 999
+              else:
+                num_cli = len(clients)
+              if (sock[1] == 0):    
+                info = 'YSFS' + str(refl_id).zfill(5) + refl_name.ljust(16) + refl_desc.ljust(14) + str(num_cli).zfill(3)
+                s.sendto(str.encode(info),addr)
+              else:
+                r = []
+                for r in REF_ALIAS:
+                  if r[0] == sock[1]:
+                    break
+                if (r):
+                  info = 'YSFS' + str(r[1]).zfill(5) + r[2].ljust(16) + r[3].ljust(14) + str(num_cli).zfill(3)     
+                  s.sendto(str.encode(info),addr)  
+                              
+            if (cmd == b'YSFV'):
+              printlog(0, 'Received command ' + cmd.decode() + ' from: ' + addr[0] + ':' + str(addr[1]))
+              info = 'YSFV' + 'pYSFReflector' + ' ' + version
+              s.sendto(str.encode(info),addr)  
+ 
+            if (cmd == b'YSFI'):
+              # Maybe we can do something usefull with this infos later?
+              printlog(0, 'Received command ' + cmd.decode() + ' from: ' + addr[0] + ':' + str(addr[1]))
+              printlog(0, 'Received information from: ' + addr[0] + ': Callsign: ' + str(data[4:14].decode().strip()) + ' RX-QRG: ' + str(data[14:23].decode().strip()) + ' TX-QRG: ' + str(data[23:32].decode().strip()) + ' Loc: ' + str(data[32:38].decode().strip()) + ' QTH: ' + str(data[38:58].decode().strip()) + ' Type: ' + str(data[58:70].decode().strip()) + ' GW-ID: ' + str(data[70:87].decode().strip()))
+            
+      except Exception as e:
+        printlog(1, 'Infinite loop error: ' + str(e))        
+                                
+    s.close()
+
+
+def printlog(log_level, mess):
+  global filelog
+  global log_basename
+  global file_rotate
+  global file_level
+  global debug
+  
+  if file_rotate == "1":
+    log_file = log_basename + '-' + str(datetime.utcnow().strftime('%Y-%m-%d')) + '.log'
+  else:
+    log_file = log_basename + '.log'
+  try:
+    if not os.path.isfile(log_file):
+      filelog.flush()
+      filelog.close()
+      filelog = open(log_file,'x')
+  except:
+    pass
+    
+  if isinstance(log_level, int):
+    if file_level <= log_level:
+      str_log = check_string('M: ' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + ' ' + mess)
+  else:
+    if log_level == "d" and debug == 1:
+      str_log = check_string('D: ' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + ' ' + mess)
+  try:
+    filelog.write(str_log + '\n') 
+    filelog.flush()
+  except:
+    pass  
+
+
+def hex_dump(data):
+  try:
+    n = 0
+    b = data[0:16]
+    while b:
+      s1 = " ".join([f"{i:02x}" for i in b]) # hex string
+      s1 = s1[0:23] + " " + s1[23:]          # insert extra space between groups of 8 hex values
+
+      s2 = "".join([chr(i) if 32 <= i <= 127 else "." for i in b]) # ascii string; chained comparison
+
+      message = f"{n * 16:08x}  {s1:<48}  |{s2}|"
+      printlog("d", message)
+      n += 1
+      b = data[n*16:(n+1)*16]
+
+  except Exception as e:
+    print(__file__, ": ", type(e).__name__, " - ", e, sep="", file=sys.stderr)
+
+
+######## main ########
+
+version = '20211212'
+
+if (len(sys.argv) != 2):
+  print('Invalid Number of Arguments')
+  print('use: YSFReflector <configuration file>')
+  sys.exit()
+  
+if (sys.argv[1].strip() == '-v'):
+  print('pYSFReflector version ' + version)
+  sys.exit()
+
+## reading configuration ##
+config=[]
+REF_ALIAS = []
+try:
+  ReadConfig(sys.argv[1].strip(), config, REF_ALIAS)
+except Exception as e:
+  print('Unable to read configuration file: ' + str(e))
+  sys.exit()
+  
+log_basename = config[3] + '/' + config[4]
+file_rotate = config[8]
+display_level = config[11]
+file_level = config[12]
+debug = config[13]
+
+### log
+if file_rotate == "1":
+  log_file = log_basename + '-' + str(datetime.utcnow().strftime('%Y-%m-%d')) + '.log'
+else:
+  log_file = log_basename + '.log'
+try:
+  if os.path.isfile(log_file):
+    filelog = open(log_file,'a')
+  else:
+    filelog = open(log_file,'x')
+except Exception as e:
+  print('Unable to Open Log File: ' + str(e))
+  sys.exit()
+  
+BLACK_LIST = [] 
+WHITE_LIST = [] 
+GW_BL = []
+IP_BL = []  
+GW_LK = []
+IP_LK = []  
+BLK_TMP = []
+SCHED = []
+W_PTT = []
+SUF_BL = []
+SN_BL = []
+GW_HOME = []
+APRS_STR = queue.Queue()
+lock_tx = threading.Lock()
+lock_nodi = threading.Lock()
+RunServer(config)
+
+  
