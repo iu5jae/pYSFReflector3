@@ -9,26 +9,27 @@ The protections section sets the communication timeout and the limitation to con
 
 if used in a "classic" way (mono stream), pYSF3 allows you to receive a connection from an external server (for example BrandMeister) with its associated TG DMR. These settings are configured in the DGID section. Let's see an example:
 
-list = 1,31
-default = 31
-local = 1
+list = 1,31<BR>
+default = 31<BR>
+local = 1<BR>
 
 so, the local DG ID (transit only on the repeater in use) is 1, all the rest is managed by the 31 (BM will arrive on this flow). If I connect my hotspot, by default I will be assigned the 31 stream and I will be able to leave the 00 setting on the radio, however everything will be operated on the 31.
 Only DG ID 1 and 31 will be able to work on the reflector and will allow me a QSO.
 
 let's see this second example:
 
-list = 1, 9, 31
-default = 31
-local = 1
+list = 1, 9, 31<BR>
+default = 31<BR>
+local = 1<BR>
+
 
 At DG ID 9 there are no external connections, BM is configured to arrive on 31 (default), 1 is always the local. In this way, using 9, I will be able to talk to all systems that use the same setting (like a private QSO reserved for the reflector only), but I will not go out to BM
 
 third example, a more advanced configuration:
 
-list = 1, 9, 31, 22
-default = 31
-local = 1
+list = 1, 9, 31, 22<BR>
+default = 31<BR>
+local = 1<BR>
 
 With this configuration I have 4 DG IDs manageable on the reflector, 1 and 9 for "local and private" configurations, the BM server will arrive on 31 and I will have DG ID 22 for a further external link, using, for example, the ysf_bridge software (to another ysf / xlx / ycs) or ysf2dmr. As TGs are used in the DMR world to switch from one stream to another, in this case I will use DG ID 31 and 22 on the C4FM radio. The change is immediate (the first PTT does not go to the network in order not to disturb).
 The last DG ID used is "stored" in /opt/pysreflector/dgid.json so that, in case of disconnection of my hotspot, the next time it is activated it resumes the last DG ID used.
@@ -45,10 +46,10 @@ It can be very useful for the diversified management of flows in combination wit
 
 sysop side of the reflector, the last section of the configuration file adds a useful feature to reduce and combine the presence of multiple YSF reflectors in a single system. In fact, it is possible to combine a flow not only with a port as we have seen previously, but also with a YSF reflector ID (identifier). By doing this, the new pYSF3 will respond to the registry like a normal YSF and it will be possible to manage (and therefore remove the old installation) a single "virtual YSF" on each DG ID. Let's see a practical example:
 
-DG-ID:port 
+DG-ID:port <BR>
 aux_port =  41:42397, 88:42398
 
-[REFL_ALIAS]
+[REFL_ALIAS]<BR>
 refl_01 = 88, 0, IT PYSF3-TEST, PYSF3 TEST REF
 
 an alias is created (refl_01, refl_02 and so on) which will contain the following information:
@@ -64,22 +65,20 @@ pYSF3 can manage the "return home"; after a TOT of time, bring the repeater / ho
 
 the collector software is used to receive data from the reflector, manage them (e.g., add description to values) and save them in a database (sqlite3). Also, in this case the possible lack of python libraries must be compensated manually. There is no external configuration file, you need to edit the collector3.py code and work on the configuration section:
 
-- reflector address and port (see json port section in pysfreflector.ini)
-srv_addr_port = ('127.0.0.1', 42223)
+- reflector address and port (see json port section in pysfreflector.ini)<BR>
+srv_addr_port = ('127.0.0.1', 42223)<BR>
 
-- path and name of the database (check access permissions)
-db = r'/opt/pysfreflector/collector3.db'
+- path and name of the database (check access permissions)<BR>
+db = r'/opt/pysfreflector/collector3.db'<BR>
 
-- to show the "blocked streams" by rules
-show_TB = True
+- to show the "blocked streams" by rules<BR>
+show_TB = True<BR>
 
-- possible associations to the serial used (BM uses a specific serial for its connection), only for better visualization in dashboard
-ser_lnks = {"BM_2222":"E0C4W", "Cluster GRF":"G0gBJ"}
+- possible associations to the serial used (BM uses a specific serial for its connection), only for better visualization in dashboard<BR>
+ser_lnks = {"BM_2222":"E0C4W", "Cluster GRF":"G0gBJ"}<BR>
 
-- any associations between DG ID and the name of the flow / connection,
-always for the dashboard view
-gid_desc = {"22":"MP_IT BM-DMR+",
-            "30":"MP_Lazio", … and so on
+- any associations between DG ID and the name of the flow / connection, always for the dashboard view<BR>
+gid_desc = {"22":"MP_IT BM-DMR+", "30":"MP_Lazio", … and so on<BR>
 
 For information, the collector, and the dashboard (php pages) can also reside on an external server for maximum operational flexibility (see pysfreflector.ini, network section).
 The collector cleans the database every minute of data older than one hour, and in any case always reserves a minimum of records for the presence in the dashboard. To ensure full functionality, run the collector by hand and check on the screen if the radio passages are correctly displayed on the shell, as well as the arrival of the gateways connected to the reflector. Then place it as a service (and with ExecStart=/usr/bin/screen -DmS collector /opt/pysfreflector/collector3.py if you like screen management).
@@ -88,11 +87,11 @@ The collector cleans the database every minute of data older than one hour, and 
 
 the html / php pages must be inserted in the directory provided within the webserver path, for example /var/www/html/ysf and be accessible as paths. The only configuration required, for each page, is to enter the path and name of the database generated by the collector. See the section and adapt it:
 
-// set path/db name
-$db = new SQLite3('/opt/pysfreflector/collector3.db');
+// set path/db name<BR>
+$db = new SQLite3('/opt/pysfreflector/collector3.db');<BR>
 
-the webserver must be active with the management of the php language and with the extensions (modules) related to the connection to the sqlite3 database. Check in (for example) /etc/php/7.3/apache2/php.ini if there is no such line:
-extension = sqlite3
+the webserver must be active with the management of the php language and with the extensions (modules) related to the connection to the sqlite3 database. Check in (for example) /etc/php/7.3/apache2/php.ini if there is no such line:<BR>
+extension = sqlite3<BR>
 Check on the internet and on the documentation the right configuration for your server regarding the functioning of php and sqlite3. Install / configure as needed and reboot. Try to run manually (php main.php) to see that all works good!
 
 the main.php page displays the QSOs, with useful information such as the status (TC = call terminated, TO = timeout, TX = transmission in progress, WD = reflector watchdog, TB = blocked callsigns - if option selected - ), the gateway from which the flow came, the type of radio and serial, coordinates, and position on openstreet map if transmitted, and more (FICH pachet info). Also, in the footer there are information about the reflector and the active flows. Everything displayed comes from the configuration of the reflector.
@@ -104,10 +103,10 @@ blocked in time page reports callsigns in timeout or given wild-PTT. They will b
 this document has been updated: 14.12.2021
 No form of warranty and support is due from the authors, the software is for amateur and experimental radio use without assurance of proper functioning. The management and maintenance of these software requires a good knowledge of computer science, the linux operating system and networks. The software is open source, manage it as such by recognizing what has been done and following the principles set out. Help your amateur radio friends and spread your knowledge. What is written can change at any time. Good fun
 
-Antonio Matraia IU5JAE
-David Bencini IK5XMK
+Antonio Matraia IU5JAE<BR>
+David Bencini IK5XMK<BR>
 
-Gruppo Radio Firenze
-www.grupporadiofirenze.net
+Gruppo Radio Firenze<BR>
+www.grupporadiofirenze.net<BR>
 
 info@grupporadiofirenze.net
