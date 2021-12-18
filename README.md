@@ -111,7 +111,6 @@ the connections page displays the repeaters and hotspots connected, in addition 
 
 blocked in time page reports callsigns in timeout or given wild-PTT. They will be resumed automatically in time.
 
-this document has been updated: 14.12.2021
 No form of warranty and support is due from the authors, the software is for amateur and experimental radio use without assurance of proper functioning. The management and maintenance of these software requires a good knowledge of computer science, the linux operating system and networks. The software is open source, manage it as such by recognizing what has been done and following the principles set out. Help your amateur radio friends and spread your knowledge. What is written can change at any time. Good fun
 
 Antonio Matraia IU5JAE<BR>
@@ -120,4 +119,4 @@ David Bencini IK5XMK<BR>
 Gruppo Radio Firenze<BR>
 www.grupporadiofirenze.net<BR>
 
-info@grupporadiofirenze.net
+https://www.grupporadiofirenze.net/forum/
