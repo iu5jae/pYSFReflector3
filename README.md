@@ -1,6 +1,17 @@
 # pYSFReflector3
 pYSF3 is a YSF C4FM Multi-stream reflector with DG ID management, open source, written in python3. It needs some libraries that you can install with "pip". It is important that you have sufficient knowledge of linux to install python3 and what is necessary on your server. Manually run the reflector before setting it in the service so that you can view the libraries not present and add them. At the end when everything starts regularly, and you have configured the .ini file you can create and manage the service for the start / stop / restart. please ask to network sysop before starting bridges or similar, if you are planning to manage.
 
+for pYSF3 you need (debian distro):
+
+python3 latest version and libs, so:<br>
+sudo apt update<br>
+sudo apt install python3 python3-pip<br>
+sudo pip install aprslib<br>
+sudo pip install tinydb<br>
+
+than chmod +x YSFReflector<br>
+and setup the service
+
 we recommend installing the reflector under the /opt/pysfreflector directory as well as the accessory software (the .ini file).
 
 the configuration file is documented internally, ultimately it is necessary to carefully configure the various sections such as the description and name of the reflector and the path for the log. The network section concerns the listening port (as configured in the ysf world database register) of the reflector, and the json port for communication towards the collector / dashboard. A complete and functional block list (in time reload) to limit disturbances is managed in the /opt/pysfreflector/deny.db file: CS:call (block callsign), AL:call (allowed)...
