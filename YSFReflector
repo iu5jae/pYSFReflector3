@@ -139,7 +139,7 @@ def ElencoNodi(cl,qjs):
       printlog(1, 'Currently linked repeaters/gateways:')
       for c in cl:
         n_r += 1
-        printlog(1, '     ' + c[2].ljust(10) + ': ' + str(c[0]) + ':' + str(c[1]) + ' ' + str(c[3]) + '/60 : ' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + ' ' + str(c[8]).rjust(2) + ' ' + str(c[9]).rjust(2) + ' ' + str(c[12]).rjust(2) + ' ' + str(c[13]).rjust(4) + ' ' + str(c[14]).rjust(4))
+        printlog(1, '     ' + c[2].ljust(10) + ': ' + str(c[0]).rjust(14) + ':' + str(c[1]).ljust(5) + ' ' + str(c[3]).rjust(2) + '/60 : ' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + ' ' + str(c[8]).rjust(2) + ' ' + str(c[9]).rjust(2) + ' ' + str(c[12]).rjust(2) + ' ' + str(c[13]).rjust(4) + ' ' + str(c[14]).rjust(4))
         sjson = '{"linked": "' + str(n_r) + '", "call": "' + c[2] + '", "IP": "' + str(c[0]) + '", "port": "' + str(c[1]) +'", "TC": "' + str(c[3]) + '", "CF": "' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + '", "LO": "' + str(c[5]) + '", "LK": "' + str(c[7]) + '", "DGID": "' + str(c[8]) + '", "T_HOLD": "' + str(c[9])  + '", "BTH_DGID": "' + str(c[12]) + '", "BTH_TOUT": "' + str(c[13]) + '", "BTH_TCORR": "' + str(c[14]) + '"}'
         qjs.put(sjson)
         if (c[5] == 1):
