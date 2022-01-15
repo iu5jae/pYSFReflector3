@@ -70,7 +70,7 @@ gid_desc = { "9":"Local_reflector",
 # *** END CONFIG SECTION ***
 
 # common
-VERSION  = "testing14" 
+VERSION  = "testing14" # fixed little issues 15.01.2022
 conn_msg = "CONNREQ"
 bye_msg  = "BYE"
 buffer   = 1024
