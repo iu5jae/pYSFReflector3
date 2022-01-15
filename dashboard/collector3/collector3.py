@@ -70,7 +70,7 @@ gid_desc = { "9":"Local_reflector",
 # *** END CONFIG SECTION ***
 
 # common
-VERSION  = "testing13" 
+VERSION  = "testing14" 
 conn_msg = "CONNREQ"
 bye_msg  = "BYE"
 buffer   = 1024
@@ -108,12 +108,18 @@ def create_connection(db_file):
 
 def get_start_time_from_db(_st_id):
     lock.acquire()
-    sql = "SELECT time FROM streams WHERE stream_id = '" + _st_id + "';"
+    sql = "SELECT time FROM streams WHERE stream_id = '" + _st_id + "';"    try: #update 11.01.2022
+        t_start = record[0]
+    except:
+        t_start = ''
     c = conn.cursor()
     c.execute(sql)
     record = c.fetchone()
     lock.release()
-    t_start = record[0]
+    try:
+        t_start = record[0]
+    except:
+        t_start = ''
     return(t_start)
     
 def obscure_IP(IP): # privacy rule
@@ -272,11 +278,17 @@ def update03_stream_in_table(_st_id, _radio_code):
         _radio_code = "FT-100"
     elif ( _radio_code =="51" ):
         _radio_code = "FT- 5D"
+    elif ( _radio_code =="45" ):
+        _radio_code = "FT3207"	
     # check in db if radio_id match a serial, so it is a link/bridge 
     sql = "SELECT radio_id FROM streams WHERE stream_id ='"+ _st_id +"';"
     c = conn.cursor()
     c.execute(sql)
     record = c.fetchone()
+    try:
+        radio_id = record[0]
+    except:
+        radio_id = 'unknown'
     radio_id = record[0]
     for key in ser_lnks:
         if ( ser_lnks[key] == radio_id ):
