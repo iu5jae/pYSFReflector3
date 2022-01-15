@@ -108,10 +108,7 @@ def create_connection(db_file):
 
 def get_start_time_from_db(_st_id):
     lock.acquire()
-    sql = "SELECT time FROM streams WHERE stream_id = '" + _st_id + "';"    try: #update 11.01.2022
-        t_start = record[0]
-    except:
-        t_start = ''
+    sql = "SELECT time FROM streams WHERE stream_id = '" + _st_id + "';"
     c = conn.cursor()
     c.execute(sql)
     record = c.fetchone()
