@@ -15,7 +15,7 @@ and setup the service
 we recommend installing the reflector under the /opt/pysfreflector directory as well as the accessory software (the .ini file).
 
 the configuration file is documented internally, ultimately it is necessary to carefully configure the various sections such as the description and name of the reflector and the path for the log. The network section concerns the listening port (as configured in the ysf world database register) of the reflector, and the json port for communication towards the collector / dashboard. A complete and functional block list (in time reload) to limit disturbances is managed in the /opt/pysfreflector/deny.db file: CS:call (block callsign), AL:call (allowed)...
-See first pYSF version on https://github.com/iu5jae/pYSFReflector#muting-matrix
+See first pYSF version on https://github.com/iu5jae/pYSFReflector#muting-matrix and the file ACL_rules.txt for infos
 The protections section sets the communication timeout and the limitation to continuous PTT strokes only to test the presence of the repeater. Finally, the aprs section (if enabled) manages the communication towards an aprs server, sending the callsigns complete with ssid if specified.
 
 if used in a "classic" way (mono stream), pYSF3 allows you to receive a connection from an external server (for example BrandMeister) with its associated TG DMR. These settings are configured in the DGID section. Let's see an example:
