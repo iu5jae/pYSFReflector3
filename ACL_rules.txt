@@ -1,0 +1,44 @@
+access control operation
+
+callsigns:
+prefixes in deny.db
+
+CS: <callsign in blacklist>
+AL: <callsign in whitelist>
+SB: <suffix blocked> (the suffix block, such as GW, RPT, ND, is useful when using auxiliary nodes to avoid double queues)
+
+this is the order in which the blocks are analyzed (the first condition checked excludes the others):
+- blocked suffixes > does not pass
+- callsigns blocked temporarily (timeout or wild-PTT)> does not pass
+
+then it depends on the CheckRE (regular expression) parameter:
+if CheckRE = 1
+
+- if it is whitelisted > switch
+- if it is blacklisted > it does not pass
+- the RE is evaluated
+
+if CheckRE = 0
+
+- if it is whitelisted > switch
+- if it is blacklisted > it does not pass
+- otherwise it passes
+
+if CheckRE = -1
+
+- if it is blacklisted > it does not pass
+- if it is whitelisted > switch
+- otherwise it does not pass
+
+other blocks:
+prefixes in deny.db
+
+GW: <gateway name>
+GWB: <gateway name>
+IP: <IP gateway>
+IPB: <IP gateway>
+SN: <radio serial number>
+
+GW and IP enable the gw to listen, but not to transmit
+GWB and IPB block the gw both in transmission and in reception, however managing the protocol, so the gateway remains connected to the reflector
+Serial SN of devices blocked in transmission
