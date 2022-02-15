@@ -736,7 +736,7 @@ sql_create_reflector_table = """
 sql_create_streams_table = """
                            CREATE TABLE streams (
                            status TEXT, 
-                           stream_id INTEGER PRIMARY KEY, 
+                           stream_id INTEGER NOT NULL, 
                            call TEXT NOT NULL, 
                            target TEXT, 
                            gw TEXT, 
