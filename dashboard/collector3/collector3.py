@@ -70,7 +70,7 @@ gid_desc = { "9":"Local_reflector",
 # *** END CONFIG SECTION ***
 
 # common
-VERSION  = "testing14" # fixed little issues 15.01.2022
+VERSION  = "testing15" # new Yaesu FTM-200 code
 conn_msg = "CONNREQ"
 bye_msg  = "BYE"
 buffer   = 1024
@@ -262,9 +262,9 @@ def update03_stream_in_table(_st_id, _radio_code):
     elif ( _radio_code =="39" ):
         _radio_code = "FT-991"
     elif ( _radio_code =="37" ):
-        _radio_code = "FT-400"
+        _radio_code = "FTM400"
     elif ( _radio_code =="49" ):
-        _radio_code = "FT-300"
+        _radio_code = "FTM300"
     elif ( _radio_code =="36" ):
         _radio_code = "FT-1XD"
     elif ( _radio_code =="46" ):
@@ -272,11 +272,13 @@ def update03_stream_in_table(_st_id, _radio_code):
     elif ( _radio_code =="40" ):
         _radio_code = "FT- 2D"
     elif ( _radio_code =="41" ):
-        _radio_code = "FT-100"
+        _radio_code = "FTM100"
     elif ( _radio_code =="51" ):
         _radio_code = "FT- 5D"
     elif ( _radio_code =="45" ):
         _radio_code = "FT3207"	
+    elif ( _radio_code =="50" ): # update 02.10.2022
+        _radio_code = "FTM200"
     # check in db if radio_id match a serial, so it is a link/bridge 
     sql = "SELECT radio_id FROM streams WHERE stream_id ='"+ _st_id +"';"
     c = conn.cursor()
