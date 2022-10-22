@@ -42,7 +42,7 @@ db = r'/opt/pysfreflector/collector3.db'
 show_TB = True
 
 # do you have special links ? set the descr/serial
-ser_lnks = {"BM_2222":"E0C4W", "Cluster GRF":"G0gBJ","BlueDV":"F5ZFW"}
+ser_lnks = {"BM_2222":"E0C4W", "XLX-Link":"G0gBJ","BlueDV":"F5ZFW"}
 
 # do you need DGID/Descriptions ?
 gid_desc = { "9":"Local_reflector",
