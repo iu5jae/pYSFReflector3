@@ -118,8 +118,6 @@ David Bencini IK5XMK<BR>
 
 Gruppo Radio Firenze<BR>
 www.grupporadiofirenze.net<BR>
-
-https://www.grupporadiofirenze.net/forum/<br>
-  
+ 
 To see a working installation: YSF#22220<br>
   http://ysf22220.dmrbrescia.it/ysf/main.php
