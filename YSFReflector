@@ -139,8 +139,8 @@ def ElencoNodi(cl,qjs):
       printlog(1, 'Currently linked repeaters/gateways:')
       for c in cl:
         n_r += 1
-        printlog(1, '     ' + c[2].ljust(10) + ': ' + str(c[0]).rjust(14) + ':' + str(c[1]).ljust(5) + ' ' + str(c[3]).rjust(2) + '/60 : ' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + ' ' + str(c[8]).rjust(2) + ' ' + str(c[9]).rjust(2) + ' ' + str(c[12]).rjust(2) + ' ' + str(c[13]).rjust(4) + ' ' + str(c[14]).rjust(4))
-        sjson = '{"linked": "' + str(n_r) + '", "call": "' + c[2] + '", "IP": "' + str(c[0]) + '", "port": "' + str(c[1]) +'", "TC": "' + str(c[3]) + '", "CF": "' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + '", "LO": "' + str(c[5]) + '", "LK": "' + str(c[7]) + '", "DGID": "' + str(c[8]) + '", "T_HOLD": "' + str(c[9])  + '", "BTH_DGID": "' + str(c[12]) + '", "BTH_TOUT": "' + str(c[13]) + '", "BTH_TCORR": "' + str(c[14]) + '"}'
+        printlog(1, '     ' + c[2].ljust(10) + ': ' + str(c[0]).rjust(16) + ':' + str(c[1]).ljust(5) + ' ' + str(c[3]).rjust(2) + '/60 : ' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + ' ' + str(c[8]).rjust(2) + ' ' + str(c[9]).rjust(2) + ' ' + str(c[12]).rjust(2) + ' ' + str(c[13]).rjust(6) + ' ' + str(c[14]).rjust(6))
+        sjson = '{"linked": "' + str(n_r) + '", "call": "' + c[2] + '", "IP": "' + str(c[0]) + '", "port": "' + str(c[1]) +'", "TC": "' + str(c[3]) + '", "CF": "' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + '", "LO": "' + str(c[5]) + '", "LK": "' + str(c[7]) + '", "DGID": "' + str(c[8]).zfill(2) + '", "T_HOLD": "' + str(c[9])  + '", "BTH_DGID": "' + str(c[12]) + '", "BTH_TOUT": "' + str(c[13]) + '", "BTH_TCORR": "' + str(c[14]) + '"}'
         qjs.put(sjson)
         if (c[5] == 1):
           cl_lo.append(c)
@@ -743,6 +743,11 @@ def ReadConfig(f,p,ra):
     prefix = 1  
 
   try:
+    bth_time = float(config['DGID']['bth_time'])
+  except:
+    bth_time = 900.0    
+    
+  try:
     for (key, val) in config.items('REFL_ALIAS'):
         val_split = val.split(',')
         if (len(val_split) == 4):
@@ -795,7 +800,8 @@ def ReadConfig(f,p,ra):
   p.append(dgid_list)          #30
   p.append(aux_port_list)      #31
   p.append(home_db)            #32
-  p.append(prefix)             #33    
+  p.append(prefix)             #33
+  p.append(bth_time)           #34    
   
     
 def sanitize_msg(data):
@@ -1299,7 +1305,7 @@ def RunServer(config):
                         fich_str = 'FICH-Data: CS:' + str(ysffich.getCS()) + ' | CM:' + str(ysffich.getCM()) + ' | FT:' + str(ysffich.getFT()) + ' | Dev:' + str(ysffich.getDev()) + ' | MR:' + str(ysffich.getMR()) + ' | VoIP:' + str(ysffich.getVoIP()) + ' | DT:' + str(ysffich.getDT()) + ' | SQL:' + str(ysffich.getSQL()) + ' | SQC:' + str(ysffich.getSQ()) 
                         fich_str_json = '"CS": "' + str(ysffich.getCS()) + '", "CM": "' + str(ysffich.getCM()) + '", "FT": "' + str(ysffich.getFT()) + '", "Dev": "' + str(ysffich.getDev()) + '", "MR": "' + str(ysffich.getMR()) + '", "VoIP": "' + str(ysffich.getVoIP()) + '", "DT": "' + str(ysffich.getDT()) + '", "SQL": "' + str(ysffich.getSQL()) + '", "SQC": "' + str(ysffich.getSQ()) + '"'
                         printlog(1, '<' + str(tx[5]).zfill(7) + '> Received data from ' + tx[3].ljust(10) +   ' to ' +  dst + ' at ' +  tx[2].ljust(10)+ ' ' + fich_str)
-                        json_mess.put('{"stream_start": "' + str(tx[5]).zfill(7) + '", "call": "' + tx[3] + '", "target": "' + dst + '", "gw": "' +  tx[2] + '",  "dgid": "' +  str(tx[9]) + '", "time": "' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '", ' + fich_str_json + '}')
+                        json_mess.put('{"stream_start": "' + str(tx[5]).zfill(7) + '", "call": "' + tx[3] + '", "target": "' + dst + '", "gw": "' +  tx[2] + '",  "dgid": "' +  str(tx[9]).zfill(2) + '", "time": "' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '", ' + fich_str_json + '}')
                         printlog(1, '<' + str(tx[5]).zfill(7) + '> Additional information dst:' +  ysfpayload.m_dest.ljust(10) + ' src:' +  ysfpayload.m_source.ljust(10) + ' uplink:' + ysfpayload.m_uplink.ljust(10) + ' downlink:' + ysfpayload.m_downlink.ljust(10))
                         json_mess.put('{"stream_id05": "' + str(tx[5]).zfill(7) + '", "dst": "' + ysfpayload.m_dest + '", "src": "' + ysfpayload.m_source + '", "uplink": "' +  ysfpayload.m_uplink + '", "downlink": "' + ysfpayload.m_downlink + '"}')
                         ckeck_wild_ptt(tx[3], wptttime, wpttcount, treactivate, json_mess)
@@ -1377,6 +1383,29 @@ def RunServer(config):
               printlog(0, 'Received command ' + cmd.decode() + ' from: ' + addr[0] + ':' + str(addr[1]))
               printlog(0, 'Received information from: ' + addr[0] + ': Callsign: ' + str(data[4:14].decode().strip()) + ' RX-QRG: ' + str(data[14:23].decode().strip()) + ' TX-QRG: ' + str(data[23:32].decode().strip()) + ' Loc: ' + str(data[32:38].decode().strip()) + ' QTH: ' + str(data[38:58].decode().strip()) + ' Type: ' + str(data[58:70].decode().strip()) + ' GW-ID: ' + str(data[70:87].decode().strip()))
             
+            if (cmd == b'YSFO'):
+              gw = str(data[4:14].decode().strip())
+              opt = str(data[14:50].decode().strip())
+              opt_dg = opt.split(';')[0]
+              try:
+                opt_dg_i = int(opt_dg)
+              except:
+                opt_dg_i = 0
+
+              if opt_dg_i in dgid_list:
+                pres = False
+                for c in clients:
+                  if ((c[0] == addr[0]) and (c[1] == addr[1]) and (c[11].getsockname()[0] == s.getsockname()[0]) and (c[11].getsockname()[1] == s.getsockname()[1])):
+                    pres = True
+                    break
+                if (pres and (c[12] == 0) and (c[9] >= 0)):
+                  lock_nodi.acquire()
+                  c[12] = opt_dg_i
+                  c[13] = config[34]
+                  c[8] = opt_dg_i
+                  lock_nodi.release()    
+                  printlog(1, 'Static DG-ID (' + opt_dg + ') via Options for ' + gw)
+    
       except Exception as e:
         printlog(1, 'Infinite loop error: ' + str(e))        
                                 
@@ -1436,7 +1465,7 @@ def hex_dump(data):
 
 ######## main ########
 
-version = '20230313'
+version = '20230922'
 
 if (len(sys.argv) != 2):
   print('Invalid Number of Arguments')

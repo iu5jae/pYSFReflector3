@@ -66,6 +66,26 @@ def aprs_string(call, latitude, longitude, radio_code, ysf_code, ssid):
     radio_str = 'FT-5D'
     symb = '['  
 
+  if (radio_code == 0x34):
+    radio_str = 'FTM-500D'
+    symb = '>'  
+  
+  if (radio_code == 0x32):
+    radio_str = 'FTM-200D'
+    symb = '>'
+    
+  if (radio_code == 0x2B):
+    radio_str = 'FT-70D'
+    symb = '['  
+  
+  if (radio_code == 0x2E):
+    radio_str = 'FTM-7250D'
+    symb = '>'
+    
+  if (radio_code == 0x2D):
+    radio_str = 'FTM-3207D'
+    symb = '>'  
+  
   # ssid = '-10'
 
   ora = datetime.utcnow()
