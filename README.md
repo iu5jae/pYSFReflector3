@@ -72,6 +72,8 @@ finally user side, a convenient function to understand, directly on the radio, o
 
 pYSF3 can manage the "return home"; after a TOT of time, bring the repeater / hotspot back to the preset flow. This functionality is managed in the home.db file, by inserting the callsign, dgid "home" and the time after when to return (after a period of inactivity of the repeater). This management is delegated by the reflector sysop. In exceptional cases, a time set to -1 "forces" the remote system to a predetermined dgid.
 
+pYSF3 can manage the "Default DGID" when connecting your hotspot or repeater. You must insert in the Network section of ysfgateway.ini of your system, after the connection reflector indication, the line Options=nn where nn indicates the DGID on which you will be positioned when entering the reflector. It can also be used for BTH (return home), managed independently without the need for server-side intervention.
+
 *****
 
 the collector software is used to receive data from the reflector, manage them (e.g., add description to values) and save them in a database (sqlite3). Also, in this case the possible lack of python libraries must be compensated manually. There is no external configuration file, you need to edit the collector3.py code and work on the configuration section:
