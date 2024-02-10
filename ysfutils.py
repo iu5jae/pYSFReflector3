@@ -5,7 +5,13 @@ import math
 
 
 def list_to_string(l):
-	return ''.join(chr(i) for i in l)
+    s_tmp = ''
+    for i in l:
+      if ((i > 31) and (i < 127)):
+        s_tmp += chr(i)
+      else:
+        s_tmp += ' '  
+    return s_tmp
 
 
 def calculateLocator(latitude, longitude):
