@@ -6,8 +6,9 @@ for pYSF3 you need (debian distro):
 python3 latest version and libs, so:<br>
 sudo apt update<br>
 sudo apt install python3 python3-pip<br>
-sudo pip install aprslib<br>
-sudo pip install tinydb<br>
+sudo pip install aprslib --break-system-packages<br>
+sudo pip install tinydb --break-system-packages<br>
+sudo pip install threaded --break-system-packages<br>
 
 than chmod +x YSFReflector<br>
 and setup the service
