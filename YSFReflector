@@ -29,7 +29,7 @@ import time
 import re
 import configparser
 import signal
-from datetime import datetime
+import datetime
 import bisect 
 import struct
 import ysffich
@@ -140,7 +140,7 @@ def ElencoNodi(cl,qjs):
       for c in cl:
         n_r += 1
         printlog(1, '     ' + c[2].ljust(10) + ': ' + str(c[0]).rjust(16) + ':' + str(c[1]).ljust(5) + ' ' + str(c[3]).rjust(2) + '/60 : ' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + ' ' + str(c[8]).rjust(2) + ' ' + str(c[9]).rjust(2) + ' ' + str(c[12]).rjust(2) + ' ' + str(c[13]).rjust(6) + ' ' + str(c[14]).rjust(6))
-        sjson = '{"linked": "' + str(n_r) + '", "call": "' + c[2] + '", "IP": "' + str(c[0]) + '", "port": "' + str(c[1]) +'", "TC": "' + str(c[3]) + '", "CF": "' + datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + '", "LO": "' + str(c[5]) + '", "LK": "' + str(c[7]) + '", "DGID": "' + str(c[8]).zfill(2) + '", "T_HOLD": "' + str(c[9])  + '", "BTH_DGID": "' + str(c[12]) + '", "BTH_TOUT": "' + str(c[13]) + '", "BTH_TCORR": "' + str(c[14]) + '"}'
+        sjson = '{"linked": "' + str(n_r) + '", "call": "' + c[2] + '", "IP": "' + str(c[0]) + '", "port": "' + str(c[1]) +'", "TC": "' + str(c[3]) + '", "CF": "' + datetime.datetime.utcfromtimestamp(c[6]).strftime("%Y-%m-%d %H:%M:%S") + '", "LO": "' + str(c[5]) + '", "LK": "' + str(c[7]) + '", "DGID": "' + str(c[8]).zfill(2) + '", "T_HOLD": "' + str(c[9])  + '", "BTH_DGID": "' + str(c[12]) + '", "BTH_TOUT": "' + str(c[13]) + '", "BTH_TCORR": "' + str(c[14]) + '"}'
         qjs.put(sjson)
         if (c[5] == 1):
           cl_lo.append(c)
@@ -157,7 +157,7 @@ def ElencoNodi(cl,qjs):
     n_r = 0
     for c in SCHED:
       n_r += 1
-      sjson = '{"blk_time": "' + str(n_r) + '", "call": "' + c[0] + '", "BR": "' + c[1] + '", "TR": "' + datetime.utcfromtimestamp(c[2]).strftime("%Y-%m-%d %H:%M:%S") + '"}'  
+      sjson = '{"blk_time": "' + str(n_r) + '", "call": "' + c[0] + '", "BR": "' + c[1] + '", "TR": "' + datetime.datetime.utcfromtimestamp(c[2]).strftime("%Y-%m-%d %H:%M:%S") + '"}'  
       qjs.put(sjson)
     sjson = '{"total_blk_time": "' + str(n_r) + '"}'
     qjs.put(sjson)
@@ -224,7 +224,7 @@ def TimeoutTX(stream, t_lock, r_lock, t_out, t_react, jsmess):
         type_ch = 'TD'
       else:
         type_ch = 'WD'
-      jsmess.put('{"stream_end": "' + str(t[5]).zfill(7) + '", "type": "' + type_ch + '", "time": "' +  str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
+      jsmess.put('{"stream_end": "' + str(t[5]).zfill(7) + '", "type": "' + type_ch + '", "time": "' +  str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
          
     if (((time.time() - t[6]) > t_out) and (t[0] != 0)):       # Tx timeout
       if (not inlist(BLK_TMP, t[3])):
@@ -233,7 +233,7 @@ def TimeoutTX(stream, t_lock, r_lock, t_out, t_react, jsmess):
         t_sched =  time.time() + t_react
         SCHED.append([t[3], 'RCT', t_sched])       # append scheduled remove from blocked list
         printlog(1, 'Appended scheduled job: ' + t[3] + '/RC at time '  + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(t_sched))) 
-        jsmess.put('{"stream_timeout": "' +  str(t[5]).zfill(7) + '", "CS": "' + t[3] + '", "time": "' +  str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
+        jsmess.put('{"stream_timeout": "' +  str(t[5]).zfill(7) + '", "CS": "' + t[3] + '", "time": "' +  str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
         stream.remove(t)
            
    pop_list = []  
@@ -335,7 +335,7 @@ def canTrasmit(cs, re_en):
 def lista_gw(cl):
   info = ''
   for c in cl:
-    info += c[2] + ':' + c[0] + ':' + str(c[1]) + ':' + datetime.utcfromtimestamp(c[6]).strftime("%d-%m-%Y %H-%M-%S") + ';'  
+    info += c[2] + ':' + c[0] + ':' + str(c[1]) + ':' + datetime.datetime.utcfromtimestamp(c[6]).strftime("%d-%m-%Y %H-%M-%S") + ';'  
   return info
 
 
@@ -1305,7 +1305,7 @@ def RunServer(config):
                         fich_str = 'FICH-Data: CS:' + str(ysffich.getCS()) + ' | CM:' + str(ysffich.getCM()) + ' | FT:' + str(ysffich.getFT()) + ' | Dev:' + str(ysffich.getDev()) + ' | MR:' + str(ysffich.getMR()) + ' | VoIP:' + str(ysffich.getVoIP()) + ' | DT:' + str(ysffich.getDT()) + ' | SQL:' + str(ysffich.getSQL()) + ' | SQC:' + str(ysffich.getSQ()) 
                         fich_str_json = '"CS": "' + str(ysffich.getCS()) + '", "CM": "' + str(ysffich.getCM()) + '", "FT": "' + str(ysffich.getFT()) + '", "Dev": "' + str(ysffich.getDev()) + '", "MR": "' + str(ysffich.getMR()) + '", "VoIP": "' + str(ysffich.getVoIP()) + '", "DT": "' + str(ysffich.getDT()) + '", "SQL": "' + str(ysffich.getSQL()) + '", "SQC": "' + str(ysffich.getSQ()) + '"'
                         printlog(1, '<' + str(tx[5]).zfill(7) + '> Received data from ' + tx[3].ljust(10) +   ' to ' +  dst + ' at ' +  tx[2].ljust(10)+ ' ' + fich_str)
-                        json_mess.put('{"stream_start": "' + str(tx[5]).zfill(7) + '", "call": "' + tx[3] + '", "target": "' + dst + '", "gw": "' +  tx[2] + '",  "dgid": "' +  str(tx[9]).zfill(2) + '", "time": "' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '", ' + fich_str_json + '}')
+                        json_mess.put('{"stream_start": "' + str(tx[5]).zfill(7) + '", "call": "' + tx[3] + '", "target": "' + dst + '", "gw": "' +  tx[2] + '",  "dgid": "' +  str(tx[9]).zfill(2) + '", "time": "' + str(datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '", ' + fich_str_json + '}')
                         printlog(1, '<' + str(tx[5]).zfill(7) + '> Additional information dst:' +  ysfpayload.m_dest.ljust(10) + ' src:' +  ysfpayload.m_source.ljust(10) + ' uplink:' + ysfpayload.m_uplink.ljust(10) + ' downlink:' + ysfpayload.m_downlink.ljust(10))
                         json_mess.put('{"stream_id05": "' + str(tx[5]).zfill(7) + '", "dst": "' + ysfpayload.m_dest + '", "src": "' + ysfpayload.m_source + '", "uplink": "' +  ysfpayload.m_uplink + '", "downlink": "' + ysfpayload.m_downlink + '"}')
                         ckeck_wild_ptt(tx[3], wptttime, wpttcount, treactivate, json_mess)
@@ -1313,7 +1313,7 @@ def RunServer(config):
                       if (id_corr not in rx_lock):
                         rx_lock.append(id_corr)  
                         printlog(1, 'Data from ' + data[14:24].decode().strip().ljust(10) + ' at ' + data[4:14].decode().strip().ljust(10) + ' blocked/' + block_r)
-                        json_mess.put('{"blocked": "-1", "CS": "' + data[14:24].decode().strip().ljust(10) + '", "GW": "' + data[4:14].decode().strip().ljust(10) + '", "BR": "' +  block_r +'", "time": "' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
+                        json_mess.put('{"blocked": "-1", "CS": "' + data[14:24].decode().strip().ljust(10) + '", "GW": "' + data[4:14].decode().strip().ljust(10) + '", "BR": "' +  block_r +'", "time": "' + str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
                       rx_lock_tout[id_corr] = 0  
                     
                     if ((id_corr == tx[0]) and (id_corr != 0)):    
@@ -1343,7 +1343,7 @@ def RunServer(config):
                         type_ch = 'TD'
                       else:
                         type_ch = 'TC'  
-                      json_mess.put('{"stream_end": "' + str(tx[5]).zfill(7) + '", "type": "' + type_ch + '", "time": "' +  str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
+                      json_mess.put('{"stream_end": "' + str(tx[5]).zfill(7) + '", "type": "' + type_ch + '", "time": "' +  str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + '"}')
                       if (aprs_en and ((tx[7] != 999.0) or (tx[8] != 999.0))):
                         s_aprs = ysfaprs.aprs_string(re.split(r'[-/]', tx[3].strip())[0], tx[7], tx[8], radio_code, str(refl_id).zfill(5), aprs_ssid)
                         if (len(s_aprs) > 5):
@@ -1420,7 +1420,7 @@ def printlog(log_level, mess):
   global debug
   
   if file_rotate == "1":
-    log_file = log_basename + '-' + str(datetime.utcnow().strftime('%Y-%m-%d')) + '.log'
+    log_file = log_basename + '-' + str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d')) + '.log'
   else:
     log_file = log_basename + '.log'
   try:
@@ -1433,10 +1433,10 @@ def printlog(log_level, mess):
     
   if isinstance(log_level, int):
     if file_level <= log_level:
-      str_log = check_string('M: ' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + ' ' + mess)
+      str_log = check_string('M: ' + str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + ' ' + mess)
   else:
     if log_level == "d" and debug == 1:
-      str_log = check_string('D: ' + str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + ' ' + mess)
+      str_log = check_string('D: ' + str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + ' ' + mess)
   try:
     filelog.write(str_log + '\n') 
     filelog.flush()
@@ -1493,7 +1493,7 @@ debug = config[13]
 
 ### log
 if file_rotate == "1":
-  log_file = log_basename + '-' + str(datetime.utcnow().strftime('%Y-%m-%d')) + '.log'
+  log_file = log_basename + '-' + str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d')) + '.log'
 else:
   log_file = log_basename + '.log'
 try:
