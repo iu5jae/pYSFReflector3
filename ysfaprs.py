@@ -70,6 +70,14 @@ def aprs_string(call, latitude, longitude, radio_code, ysf_code, ssid):
     radio_str = 'FTM-500D'
     symb = '>'  
   
+  if (radio_code == 0x35):
+    radio_str = 'FTM-510D'
+    symb = '>'  
+  
+  if (radio_code == 0x2A):
+    radio_str = 'FTM-3200D'
+    symb = '>'  
+  
   if (radio_code == 0x32):
     radio_str = 'FTM-200D'
     symb = '>'
