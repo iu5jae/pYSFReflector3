@@ -281,6 +281,10 @@ def update03_stream_in_table(_st_id, _radio_code):
         _radio_code = "FT3207"	
     elif ( _radio_code =="50" ): # update 02.10.2022
         _radio_code = "FTM200"
+    elif ( _radio_code =="53" ): # update 28.03.2025
+        _radio_code = "FTM510"
+    elif ( _radio_code =="42" ): # update 28.03.2025
+        _radio_code = "FTM3200"        
     # check in db if radio_id match a serial, so it is a link/bridge 
     sql = "SELECT radio_id FROM streams WHERE stream_id ='"+ _st_id +"';"
     c = conn.cursor()
