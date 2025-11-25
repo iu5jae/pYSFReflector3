@@ -267,6 +267,8 @@ def update03_stream_in_table(_st_id, _radio_code):
         _radio_code = "FTM400"
     elif ( _radio_code =="49" ):
         _radio_code = "FTM300"
+    elif ( _radio_code =="55" ):
+        _radio_code = "FTM310" # update 25.11.2025
     elif ( _radio_code =="36" ):
         _radio_code = "FT-1XD"
     elif ( _radio_code =="46" ):
