@@ -5,6 +5,7 @@ import aprslib
 import time
 import math
 from datetime import datetime, date
+from datetime import timezone
 import sys
 
 # aprs last heard
@@ -96,7 +97,7 @@ def aprs_string(call, latitude, longitude, radio_code, ysf_code, ssid):
   
   # ssid = '-10'
 
-  ora = datetime.utcnow()
+  ora = datetime.now(tz=timezone.utc)
   oraz = ora.strftime("%d%H%M")
   lat = aprslib.util.latitude_to_ddm(latitude)
   long = aprslib.util.longitude_to_ddm(longitude)
